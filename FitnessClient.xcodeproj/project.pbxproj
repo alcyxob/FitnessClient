@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		1C9FE7DD2DCA1F0500D926D7 /* KeychainAccess in Frameworks */ = {isa = PBXBuildFile; productRef = 1C9FE7DC2DCA1F0500D926D7 /* KeychainAccess */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		1C9FE7B72DC9FC5E00D926D7 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -29,9 +33,22 @@
 		1C9FE7C02DC9FC5E00D926D7 /* FitnessClientUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FitnessClientUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		1C9FE7DA2DC9FEEE00D926D7 /* Exceptions for "FitnessClient" folder in "FitnessClient" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 1C9FE7A82DC9FC5C00D926D7 /* FitnessClient */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		1C9FE7AB2DC9FC5C00D926D7 /* FitnessClient */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				1C9FE7DA2DC9FEEE00D926D7 /* Exceptions for "FitnessClient" folder in "FitnessClient" target */,
+			);
 			path = FitnessClient;
 			sourceTree = "<group>";
 		};
@@ -52,6 +69,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1C9FE7DD2DCA1F0500D926D7 /* KeychainAccess in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +130,7 @@
 			);
 			name = FitnessClient;
 			packageProductDependencies = (
+				1C9FE7DC2DCA1F0500D926D7 /* KeychainAccess */,
 			);
 			productName = FitnessClient;
 			productReference = 1C9FE7A92DC9FC5C00D926D7 /* FitnessClient.app */;
@@ -195,6 +214,9 @@
 			);
 			mainGroup = 1C9FE7A02DC9FC5C00D926D7;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				1C9FE7DB2DCA1F0400D926D7 /* XCRemoteSwiftPackageReference "KeychainAccess" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1C9FE7AA2DC9FC5C00D926D7 /* Products */;
 			projectDirPath = "";
@@ -400,6 +422,7 @@
 				DEVELOPMENT_TEAM = 6K3L3Q223Q;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FitnessClient/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -428,6 +451,7 @@
 				DEVELOPMENT_TEAM = 6K3L3Q223Q;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FitnessClient/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -558,6 +582,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		1C9FE7DB2DCA1F0400D926D7 /* XCRemoteSwiftPackageReference "KeychainAccess" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/kishikawakatsumi/KeychainAccess";
+			requirement = {
+				branch = master;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1C9FE7DC2DCA1F0500D926D7 /* KeychainAccess */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1C9FE7DB2DCA1F0400D926D7 /* XCRemoteSwiftPackageReference "KeychainAccess" */;
+			productName = KeychainAccess;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 1C9FE7A12DC9FC5C00D926D7 /* Project object */;
 }
