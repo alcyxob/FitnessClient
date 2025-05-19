@@ -40,7 +40,7 @@ struct APIErrorResponse: Codable, Error {
 struct Exercise: Codable, Identifiable, Hashable, Equatable { // Added Equatable
     let id: String
     let trainerId: String
-    let name: String
+    var name: String
     var description: String?
     var muscleGroup: String?
     var executionTechnic: String?
@@ -185,10 +185,10 @@ struct Workout: Codable, Identifiable, Hashable {
     let trainingPlanId: String
     let trainerId: String
     let clientId: String
-    let name: String
-    let dayOfWeek: Int? // Optional: 1 (Mon) - 7 (Sun)
-    let notes: String?
-    let sequence: Int // Order within the plan
+    var name: String
+    var dayOfWeek: Int? // Optional: 1 (Mon) - 7 (Sun)
+    var notes: String?
+    var sequence: Int // Order within the plan
     let createdAt: Date
     let updatedAt: Date
 
@@ -203,4 +203,19 @@ struct CreateWorkoutPayload: Codable {
     var dayOfWeek: Int?
     var notes: String?
     let sequence: Int
+}
+
+struct UploadURLResponse: Codable {
+    let uploadUrl: String
+    let objectKey: String
+}
+
+struct VideoDownloadURLResponse: Codable {
+    let downloadUrl: String // Ensure key matches Go JSON: "downloadUrl"
+}
+
+// Payload for the Trainer's "Submit Feedback" API request
+struct SubmitFeedbackPayload: Codable {
+    let feedback: String? // Backend might allow empty feedback if only status changes
+    let status: String   // The new status (e.g., "reviewed", "assigned")
 }

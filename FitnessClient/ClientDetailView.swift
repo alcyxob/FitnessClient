@@ -127,8 +127,8 @@ struct ClientDetailView: View {
                             }
                             .padding(.vertical, 3) // Add a bit of padding to list items
                         }
-                        // TODO: Add .onDelete for plans later if needed
                     }
+                    .onDelete(perform: deletePlans)
                 }
             } // End Training Plans Section
         } // End List
@@ -169,6 +169,29 @@ struct ClientDetailView: View {
              await viewModel.fetchTrainingPlans()
         }
     } // End body
+    
+    // --- NEW: Function to handle deletion ---
+    private func deletePlans(at offsets: IndexSet) {
+        // Get the IDs of the plans to delete based on the offsets
+        let plansToDelete = offsets.map { viewModel.trainingPlans[$0] }
+        
+        Task {
+            for plan in plansToDelete {
+                print("ClientDetailView: Requesting delete for plan ID: \(plan.id)")
+                let success = await viewModel.deleteTrainingPlan(planId: plan.id)
+                if !success {
+                    // Error message is handled by the ViewModel and displayed in the UI
+                    print("ClientDetailView: Failed to delete plan \(plan.id). Error: \(viewModel.errorMessage ?? "Unknown")")
+                    // Optionally break or collect all errors to show once
+                    break
+                }
+            }
+            // If optimistic update wasn't fully reliable or you want to ensure server state:
+            // await viewModel.fetchTrainingPlans()
+            // However, the ViewModel already removes it locally on success.
+        }
+    }
+        // --- END deletePlans function ---
 } // End struct ClientDetailView
 
 

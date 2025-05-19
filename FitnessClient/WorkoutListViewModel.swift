@@ -63,4 +63,47 @@ class WorkoutListViewModel: ObservableObject {
         }
         isLoading = false
     }
+    
+    // --- Delete Workout ---
+    func deleteWorkout(workoutId: String) async -> Bool {
+        guard let currentTrainerId = authService.loggedInUser?.id else {
+            errorMessage = "Authentication error."
+            return false
+        }
+        // Ensure this trainer owns the plan this workout belongs to.
+        // The workoutId itself is also checked for ownership by trainer in repo.
+        if trainingPlan.trainerId != currentTrainerId {
+            errorMessage = "Access Denied: You do not own the parent training plan."
+            return false
+        }
+
+        print("WorkoutListVM: Deleting workout ID: \(workoutId) from plan \(trainingPlan.id)")
+        isLoading = true // Can use general loading flag
+        let previousErrorMessage = errorMessage
+        errorMessage = nil
+
+        // Endpoint: /trainer/plans/{planId}/workouts/{workoutId}
+        let endpoint = "/trainer/plans/\(trainingPlan.id)/workouts/\(workoutId)"
+
+        do {
+            try await apiService.DELETE(endpoint: endpoint)
+            print("WorkoutListVM: Successfully deleted workout \(workoutId)")
+            
+            self.workouts.removeAll { $0.id == workoutId } // Optimistic UI update
+            if workouts.isEmpty {
+                errorMessage = "This training plan doesn't have any workouts scheduled yet."
+            }
+            isLoading = false
+            return true
+        } catch let error as APINetworkError {
+            self.errorMessage = "Delete failed: \(error.localizedDescription)"
+            print("WorkoutListVM: Error deleting workout (APINetworkError): \(error.localizedDescription)")
+        } catch {
+            self.errorMessage = "An unexpected error occurred while deleting."
+            print("WorkoutListVM: Unexpected error deleting workout: \(error.localizedDescription)")
+        }
+        if self.errorMessage != nil && previousErrorMessage != nil { /* ... restore previous error logic ... */ }
+        isLoading = false
+        return false
+    }
 }

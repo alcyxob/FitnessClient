@@ -21,6 +21,7 @@ class AssignExerciseViewModel: ObservableObject {
     @Published var errorMessage: String? = nil
     @Published var didAssignSuccessfully = false
 
+    let workout: Workout
     private let apiService: APIService
     private let authService: AuthService // Needed for trainer ID
 
@@ -29,9 +30,11 @@ class AssignExerciseViewModel: ObservableObject {
         selectedClientId != nil && selectedExerciseId != nil && !isAssigning
     }
 
-    init(apiService: APIService, authService: AuthService) {
+    init(workout: Workout, apiService: APIService, authService: AuthService) {
+        self.workout = workout
         self.apiService = apiService
         self.authService = authService
+        print("AssignListVM: Initialized for workout: \(workout.name) (\(workout.id))")
     }
 
     // --- Data Fetching ---
@@ -115,5 +118,41 @@ class AssignExerciseViewModel: ObservableObject {
             print("AssignVM Unexpected error assigning exercise: \(error.localizedDescription)")
             isAssigning = false
         }
+    }
+    
+    func fetchVideoDownloadURL(for assignment: Assignment) async -> URL? {
+        guard let trainerId = authService.loggedInUser?.id else { // Assuming authService is a property or passed to init
+            print("AssignListVM (Trainer): Trainer ID not found for fetching video URL.")
+            self.errorMessage = "Authentication error." // Or a more general error
+            return nil
+        }
+        // Ensure the trainer actually owns this assignment's workout
+        // This check is also in the backend, but good for client-side quick fail
+        if self.workout.trainerId != trainerId {
+             print("AssignListVM (Trainer): Trainer does not own this workout (\(workout.id)) to fetch video URL for assignment \(assignment.id).")
+             self.errorMessage = "Access Denied."
+             return nil
+        }
+
+        print("AssignListVM (Trainer): Fetching video download URL for assignment ID: \(assignment.id)")
+        // isLoadingVideoForAssignmentId = assignment.id // Optional: per-item loading state
+        self.errorMessage = nil // Clear previous general errors
+
+        let endpoint = "/trainer/assignments/\(assignment.id)/video-download-url"
+        
+        do {
+            let response: VideoDownloadURLResponse = try await apiService.GET(endpoint: endpoint) // Expects VideoDownloadURLResponse DTO
+            print("AssignListVM (Trainer): Received video download URL.")
+            // isLoadingVideoForAssignmentId = nil
+            return URL(string: response.downloadUrl)
+        } catch let error as APINetworkError {
+            self.errorMessage = "Could not get video URL: \(error.localizedDescription)"
+            print("AssignListVM (Trainer): Error fetching video URL (APINetworkError): \(error.localizedDescription)")
+        } catch {
+            self.errorMessage = "An unexpected error occurred getting video URL."
+            print("AssignListVM (Trainer): Unexpected error fetching video URL: \(error.localizedDescription)")
+        }
+        // isLoadingVideoForAssignmentId = nil
+        return nil
     }
 }

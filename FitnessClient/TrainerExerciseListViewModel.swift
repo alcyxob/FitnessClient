@@ -56,4 +56,44 @@ class TrainerExerciseListViewModel: ObservableObject {
         }
         isLoading = false
     }
+    
+    // --- Delete Exercise ---
+    func deleteExercise(exerciseId: String) async -> Bool { // Return bool for success
+        guard let trainer = authService.loggedInUser, trainer.role == "trainer" else {
+            errorMessage = "Authentication error or not a trainer."
+            return false
+        }
+        
+        print("TrainerExerciseListVM: Deleting exercise ID: \(exerciseId)")
+        // No general isLoading for delete, UI might handle per-row
+        // For now, let's set the general one for simplicity
+        isLoading = true // Indicate an operation is in progress
+        let previousErrorMessage = errorMessage // Store to restore if delete fails but list was fine
+        errorMessage = nil
+
+        let endpoint = "/exercises/\(exerciseId)" // Trainer ID is implicit in token
+
+        do {
+            // APIService.DELETE doesn't return a body to decode
+            try await apiService.DELETE(endpoint: endpoint)
+            print("TrainerExerciseListVM: Successfully deleted exercise \(exerciseId)")
+            
+            // Remove from local list optimistically or re-fetch
+            self.exercises.removeAll { $0.id == exerciseId }
+            
+            isLoading = false
+            return true // Success
+        } catch let error as APINetworkError {
+            self.errorMessage = "Delete failed: \(error.localizedDescription)"
+            print("TrainerExerciseListVM: Error deleting exercise (APINetworkError): \(error.localizedDescription)")
+        } catch {
+            self.errorMessage = "An unexpected error occurred while deleting."
+            print("TrainerExerciseListVM: Unexpected error deleting exercise: \(error.localizedDescription)")
+        }
+        isLoading = false
+        if errorMessage != nil && previousErrorMessage != nil { // Restore previous list error if delete failed
+             self.errorMessage = previousErrorMessage
+        }
+        return false // Failure
+    }
 }

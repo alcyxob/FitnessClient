@@ -14,6 +14,8 @@ struct WorkoutListView: View {
 
     // State to control the presentation of the "Create Workout" sheet.
     @State private var showingCreateWorkoutSheet = false
+    
+    @State private var workoutToEdit: Workout? = nil
 
     // Initializer expects the specific TrainingPlan and the necessary services
     // to create its own ViewModel.
@@ -74,41 +76,37 @@ struct WorkoutListView: View {
             // --- Data Loaded State ---
             else {
                  ForEach(viewModel.workouts) { workout in
-                     // Wrap each workout row in a NavigationLink to go to AssignmentListView
-                     NavigationLink {
-                         // Destination: AssignmentListView for the selected workout
-                         AssignmentListView(
-                            workout: workout,        // Pass the specific workout
-                            apiService: apiService   // Pass the APIService from environment
-                         )
-                         // authService can be passed if AssignmentListView or its children need it directly
-                         // .environmentObject(authService)
-                     } label: {
-                         // Label: How the workout row looks in the list
-                         VStack(alignment: .leading, spacing: 4) {
-                             Text(workout.name)
-                                 .font(.headline)
-                             HStack {
+                     Button {
+                         self.workoutToEdit = workout // Set state to trigger edit sheet
+                     }  label: {
+                         HStack {
+                             // Label: How the workout row looks in the list
+                             VStack(alignment: .leading, spacing: 4) {
+                                 Text(workout.name)
+                                     .font(.headline)
+                                 
                                  if let dayIndex = workout.dayOfWeek, dayIndex > 0 && dayIndex < viewModel.daysOfWeek.count {
                                      Text("Day: \(viewModel.daysOfWeek[dayIndex])")
                                          .font(.caption)
                                          .foregroundColor(.blue)
                                  }
                                  Text("Seq: \(workout.sequence)") // Display sequence
-                                    .font(.caption)
-                                    .foregroundColor(.purple)
-                             }
-                             if let notes = workout.notes, !notes.isEmpty {
-                                 Text(notes)
                                      .font(.caption)
-                                     .foregroundColor(.gray)
-                                     .lineLimit(1) // Show a snippet of notes
+                                     .foregroundColor(.purple)
+                                 
+                                 if let notes = workout.notes, !notes.isEmpty {
+                                     Text(notes)
+                                         .font(.caption)
+                                         .foregroundColor(.gray)
+                                         .lineLimit(1) // Show a snippet of notes
+                                 }
                              }
                          }
                          .padding(.vertical, 5)
-                     } // End Label
+                     }
+                     .buttonStyle(.plain)// End Label
                  } // End ForEach
-                 // TODO: Add .onDelete for workouts later if needed
+                .onDelete(perform: deleteWorkouts)
             } // End Else (Data Loaded)
         } // End List
         .navigationTitle("Workouts: \(viewModel.trainingPlan.name)") // Set title using plan name
@@ -138,6 +136,18 @@ struct WorkoutListView: View {
             // Pass authService if CreateWorkoutView needs it directly (unlikely for now)
             // .environmentObject(authService)
         }
+       .sheet(item: $workoutToEdit, onDismiss: {
+           // item-based sheet: when workoutToEdit is non-nil, sheet shows.
+           // On dismiss, workoutToEdit automatically becomes nil. Refresh list.
+           Task { await viewModel.fetchWorkoutsForPlan() }
+       }) { currentWorkoutToEdit in // Receives the non-nil Workout
+           EditWorkoutView(
+               workoutToEdit: currentWorkoutToEdit,
+               apiService: apiService
+           )
+           // Pass authService if EditWorkoutView's VM needs it, but it shouldn't
+           // .environmentObject(authService)
+       }
         .onAppear {
             // Action when the view first appears
             // Fetch workouts if the list is currently empty
@@ -152,6 +162,22 @@ struct WorkoutListView: View {
              await viewModel.fetchWorkoutsForPlan()
         }
     } // End body
+    
+    // --- Delete Function for .onDelete ---
+    private func deleteWorkouts(at offsets: IndexSet) {
+        let workoutsToDelete = offsets.map { viewModel.workouts[$0] }
+        Task {
+            for workout in workoutsToDelete {
+                print("WorkoutListView: Requesting delete for workout ID: \(workout.id)")
+                let success = await viewModel.deleteWorkout(workoutId: workout.id)
+                if !success {
+                    print("WorkoutListView: Failed to delete workout \(workout.id). Error: \(viewModel.errorMessage ?? "Unknown")")
+                    break // Stop on first error
+                }
+            }
+            // ViewModel handles optimistic removal or you can refresh here if needed
+        }
+    }
 } // End struct WorkoutListView
 
 

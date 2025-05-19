@@ -10,6 +10,7 @@ struct TrainerExerciseListView: View {
     @EnvironmentObject var authService: AuthService // Though CreateExerciseViewModel might not need authService directly if apiService handles token
 
     @State private var showingCreateExerciseSheet = false
+    @State private var exerciseToEdit: Exercise? = nil
 
     var body: some View {
         // Use NavigationView to get a navigation bar for the title and "+" button
@@ -51,33 +52,27 @@ struct TrainerExerciseListView: View {
                 } else {
                     List {
                         ForEach(viewModel.exercises) { exercise in
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(exercise.name)
-                                    .font(.headline)
-                                
-                                if let muscle = exercise.muscleGroup, !muscle.isEmpty {
-                                    Text("Muscle: \(muscle)")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
+                            // --- Make Row Tappable for Edit ---
+                            Button { // Using Button to trigger sheet for edit
+                                self.exerciseToEdit = exercise
+                            } label: {
+                                HStack { // Ensure content aligns left
+                                    VStack(alignment: .leading, spacing: 5) {
+                                        Text(exercise.name).font(.headline)
+                                        if let muscle = exercise.muscleGroup, !muscle.isEmpty {
+                                             Text("Muscle: \(muscle)").font(.caption)
+                                        }
+                                        Text(exercise.description ?? "No description")
+                                            .font(.subheadline).foregroundColor(.gray).lineLimit(2)
+                                    }
+                                    Spacer() // Pushes content to left, allows full row tap
                                 }
-                                
-                                if let difficulty = exercise.difficulty, !difficulty.isEmpty {
-                                    Text("Difficulty: \(difficulty)")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-
-                                if let desc = exercise.description, !desc.isEmpty {
-                                    Text(desc)
-                                        .font(.subheadline)
-                                        .foregroundColor(.gray)
-                                        .lineLimit(2) // Show a preview of the description
-                                }
-                                // TODO: Add more details or a way to navigate to a detail view
                             }
-                            .padding(.vertical, 4) // Add some vertical padding to list items
+                            .buttonStyle(.plain) // Make it look like a normal row item
+                            // Optional: Add context menu for Edit/Delete instead of swipe
                         }
-                        // .onDelete(perform: deleteExercises) // Placeholder for delete
+                        // --- Add Swipe to Delete ---
+                        .onDelete(perform: deleteExercises)
                     }
                     .listStyle(.plain) // Or .insetGrouped for a different look
                 }
@@ -114,6 +109,17 @@ struct TrainerExerciseListView: View {
                     // but typically ViewModel handles that.
                     // .environmentObject(authService)
             }
+            // --- Sheet for Editing Exercise ---
+            .sheet(item: $exerciseToEdit, onDismiss: {
+                // item based sheet, when exerciseToEdit becomes non-nil, it shows
+                // onDismiss, exerciseToEdit becomes nil, and we refresh
+                Task { await viewModel.fetchTrainerExercises() }
+            }) { currentExerciseToEdit in // Receives the non-nil Exercise
+                EditExerciseView(
+                    exerciseToEdit: currentExerciseToEdit,
+                    apiService: apiService
+                )
+            }
             .onAppear {
                 // Fetch exercises when the view first appears,
                 // but only if the list is currently empty (to avoid re-fetching on every tab switch
@@ -128,6 +134,29 @@ struct TrainerExerciseListView: View {
         }
         // Apply userInterfaceIdiom check if you want different navigation styles for iPad
         // .navigationViewStyle(UIDevice.current.userInterfaceIdiom == .pad ? .columns : .stack)
+    }
+    
+    // --- Delete Function for .onDelete ---
+    private func deleteExercises(at offsets: IndexSet) {
+        // Get the IDs of exercises to delete
+        let idsToDelete = offsets.map { viewModel.exercises[$0].id }
+        Task {
+            var allSucceeded = true
+            for id in idsToDelete {
+                let success = await viewModel.deleteExercise(exerciseId: id)
+                if !success {
+                    allSucceeded = false
+                    // Error message is set by viewModel, view will update
+                    break // Stop on first error
+                }
+            }
+            if allSucceeded && !idsToDelete.isEmpty {
+                // If optimistic removal wasn't done, or to confirm, fetch again
+                // Or, if viewModel.deleteExercise already removed it from @Published var,
+                // this might not be strictly necessary, but good for consistency.
+                // await viewModel.fetchTrainerExercises() // ViewModel already removes locally
+            }
+        }
     }
 
     // Placeholder for delete functionality

@@ -108,6 +108,18 @@ class APIService: ObservableObject {
         // We use EmptyDecodable for the type T when we don't expect a body or don't need to decode one.
         let _: EmptyDecodable = try await performRequest(endpoint: endpoint, method: "DELETE", body: Optional<Data>.none, queryItems: queryItems)
     }
+    
+    // --- Generic PATCH Request ---
+    func PATCH<Body: Encodable, T: Decodable>(endpoint: String, body: Body, queryItems: [URLQueryItem]? = nil) async throws -> T {
+        let bodyData = try jsonEncoder.encode(body) // Use self.jsonEncoder
+        return try await performRequest(endpoint: endpoint, method: "PATCH", body: bodyData, queryItems: queryItems)
+    }
+
+    // Overload for PATCH when no decodable response body is expected (e.g. 204 No Content)
+    func PATCH<Body: Encodable>(endpoint: String, body: Body, queryItems: [URLQueryItem]? = nil) async throws {
+        let bodyData = try jsonEncoder.encode(body)
+        let _: EmptyDecodable = try await performRequest(endpoint: endpoint, method: "PATCH", body: bodyData, queryItems: queryItems)
+    }
 
     // --- Core Request Logic ---
     private func performRequest<T: Decodable>(endpoint: String, method: String, body: Data? = nil, queryItems: [URLQueryItem]? = nil) async throws -> T {

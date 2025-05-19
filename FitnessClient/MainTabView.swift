@@ -3,96 +3,108 @@ import SwiftUI
 
 struct MainTabView: View {
     @EnvironmentObject var authService: AuthService
-    @EnvironmentObject var apiService: APIService // Get APIService from environment
+    @EnvironmentObject var apiService: APIService
 
     var body: some View {
         TabView {
             // --- Tab 1: Home/Dashboard ---
-            VStack {
-                Text("Welcome to the App!")
-                    .font(.largeTitle)
-                    .padding()
-
-                if let user = authService.loggedInUser {
-                    Text("Logged in as: \(user.email)")
-                    Text("Role: \(user.role)")
-                } else {
-                    Text("User details not available.")
-                }
-
-                Button("Logout") {
-                    Task {
-                        await authService.logout()
-                    }
-                }
-                .padding()
-                .buttonStyle(.borderedProminent)
-            }
-            .tabItem {
-                Label("Home", systemImage: "house.fill")
-            }
+            VStack { /* ... home tab content ... */ }
+            .tabItem { Label("Home", systemImage: "house.fill") }
             .tag(0)
 
-            // --- Tab 2: Exercises (Visible only to Trainers) ---
+            // --- Tab 2: Role-Specific Primary View ---
             if authService.loggedInUser?.role == "trainer" {
-                // Create the ViewModel instance here and pass it to the view
-                TrainerExerciseListView(
-                    viewModel: TrainerExerciseListViewModel(apiService: apiService, authService: authService)
-                )
-                .tabItem {
-                    Label("My Exercises", systemImage: "figure.run.circle.fill")
-                }
-                .tag(1)
+                TrainerExerciseListView(viewModel: TrainerExerciseListViewModel(apiService: apiService, authService: authService))
+                    .tabItem { Label("My Exercises", systemImage: "figure.run.circle.fill") }
+                    .tag(1)
             } else if authService.loggedInUser?.role == "client" {
-                // --- Placeholder for Client's "My Assignments" Tab ---
-                Text("Client Assignments Tab (Placeholder)")
-                    .tabItem {
-                        Label("My Workouts", systemImage: "list.bullet.clipboard.fill")
-                    }
-                    .tag(1) // Use same tag if it's replacing the trainer tab
+                // ---> Show ClientPlansView for CLIENTS <---
+                ClientPlansView(apiService: apiService) // Pass apiService
+                    .tabItem { Label("My Plans", systemImage: "list.star") } // Icon for plans
+                    .tag(1) // Can reuse tag if it's an either/or scenario
             }
-            
-            //Tab 3: Clients (Visible only to Trainers) ---
+
+            // --- Tab 3: Clients (Trainers) OR Other Client Tab ---
             if authService.loggedInUser?.role == "trainer" {
-                 TrainerClientsView(
-                     viewModel: TrainerClientsViewModel(apiService: apiService)
-                 )
-                 .tabItem {
-                     Label("My Clients", systemImage: "person.2.fill")
-                 }
-                 .tag(2) // Assign a unique tag
+                 TrainerClientsView(viewModel: TrainerClientsViewModel(apiService: apiService))
+                 .tabItem { Label("My Clients", systemImage: "person.2.fill") }
+                 .tag(2)
+             } else if authService.loggedInUser?.role == "client" {
+                 // Placeholder for another client tab, e.g., "Progress" or "Profile"
+                 Text("Client Progress (Placeholder)")
+                     .tabItem { Label("Progress", systemImage: "chart.bar.xaxis") }
+                     .tag(2)
              }
 
-            // Tab 4: Assign (Trainers) ---
-            if authService.loggedInUser?.role == "trainer" {
-                AssignExerciseView(apiService: apiService, authService: authService)
-                 .tabItem {
-                     Label("Assign", systemImage: "figure.mixed.cardio") // Or other suitable icon
-                 }
-                 .tag(3) // Adjust tag number
-             }
+             // No specific 4th tab for client yet, or can be combined
 
-            // --- Tab 5: Settings ---
-            Text("Settings Tab (Placeholder)")
-                .tabItem {
-                    Label("Settings", systemImage: "gearshape.fill")
-                }
-                .tag(2)
+            SettingsView() // <<< REPLACE Placeholder Text HERE
+                .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+                .tag(3) 
         }
     }
 }
 
-// Preview provider for MainTabView remains the same, but now needs APIService too
+// Preview Provider for MainTabView
 struct MainTabView_Previews: PreviewProvider {
-    static var previews: some View {
-        let mockAuthService = AuthService()
-        let mockAPIService = APIService(authService: mockAuthService)
-        // Simulate logged in user for preview:
-        // mockAuthService.authToken = "preview_token"
-        // mockAuthService.loggedInUser = UserResponse(id: "previewUser", name: "Preview User", email: "preview@example.com", role: "trainer", createdAt: Date(), clientIds: nil, trainerId: nil)
 
-        MainTabView()
-            .environmentObject(mockAuthService)
-            .environmentObject(mockAPIService)
+    // Helper Wrapper View for MainTabView Previews (remains the same)
+    struct PreviewWrapper: View {
+        let authService: AuthService
+        let apiService: APIService
+
+        var body: some View {
+            MainTabView()
+                .environmentObject(authService)
+                .environmentObject(apiService)
+        }
+    }
+
+    // Helper function to create a configured "Trainer" preview instance
+    static func trainerPreview() -> some View {
+        let mockAuthTrainer = AuthService()
+        mockAuthTrainer.authToken = "trainer_token_preview"
+        mockAuthTrainer.loggedInUser = UserResponse(
+            id: "t_prev_main",
+            name: "Trainer Preview Main",
+            email: "t_main@p.com",
+            role: "trainer",
+            createdAt: Date(),
+            clientIds: nil,
+            trainerId: nil
+        )
+        let mockApiTrainer = APIService(authService: mockAuthTrainer)
+        
+        return PreviewWrapper(authService: mockAuthTrainer, apiService: mockApiTrainer)
+    }
+
+    // Helper function to create a configured "Client" preview instance
+    static func clientPreview() -> some View {
+        let mockAuthClient = AuthService()
+        mockAuthClient.authToken = "client_token_preview"
+        mockAuthClient.loggedInUser = UserResponse(
+            id: "c_prev_main",
+            name: "Client Preview Main",
+            email: "c_main@p.com",
+            role: "client",
+            createdAt: Date(),
+            clientIds: nil,
+            trainerId: "t_prev_main"
+        )
+        let mockApiClient = APIService(authService: mockAuthClient)
+
+        return PreviewWrapper(authService: mockAuthClient, apiService: mockApiClient)
+    }
+
+    static var previews: some View {
+        Group {
+            trainerPreview() // Call the helper function
+                .previewDisplayName("As Trainer")
+
+            clientPreview() // Call the helper function
+                .previewDisplayName("As Client")
+        }
+        // No .environmentObject needed on the Group here,
+        // as PreviewWrapper handles it internally for each case.
     }
 }
