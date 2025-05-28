@@ -114,6 +114,53 @@ class ClientAssignmentListViewModel: ObservableObject {
         }
     }
 
+    // --- Log Performance for an Assignment ---
+    func logPerformance(for assignmentId: String, achievedData: LogPerformancePayload) async -> Bool { // Return success
+        print("ClientAssignListVM: Logging performance for assignment \(assignmentId)")
+        // For per-item loading/error, you'd need more complex state in assignmentsWithExercises
+        // For now, we can use the general errorMessage or just rely on UI update.
+        // self.isLoading = true // Or a specific loading flag
+        let previousErrorMessage = self.errorMessage
+        self.errorMessage = nil
+
+        let endpoint = "/client/assignments/\(assignmentId)/performance"
+
+        do {
+            let updatedAssignment: Assignment = try await apiService.PATCH(endpoint: endpoint, body: achievedData)
+            
+            // Update the local list with the confirmed new state from the server
+            if let index = assignmentsWithExercises.firstIndex(where: { $0.id == updatedAssignment.id }) {
+                var assignmentToUpdate = updatedAssignment
+                // Preserve exercise detail if it was already fetched and not returned by PATCH
+                if let existingExercise = assignmentsWithExercises[index].exercise {
+                     assignmentToUpdate.exercise = existingExercise
+                } else if !updatedAssignment.exerciseId.isEmpty && assignmentToUpdate.exercise == nil { // Refetch if needed
+                    do {
+                        let exerciseDetail: Exercise = try await apiService.GET(endpoint: "/exercises/\(updatedAssignment.exerciseId)")
+                        assignmentToUpdate.exercise = exerciseDetail
+                    } catch { /* ... log warn ... */ }
+                }
+                assignmentsWithExercises[index] = assignmentToUpdate
+                print("ClientAssignListVM: Performance logged successfully for \(assignmentId).")
+                // self.isLoading = false
+                return true
+            } else {
+                print("ClientAssignListVM: Logged assignment not found in local list, refreshing all.")
+                await self.fetchMyAssignmentsForWorkout() // Fallback
+                // self.isLoading = false
+                return true // Still successful from API perspective
+            }
+        } catch let error as APINetworkError {
+            self.errorMessage = "Failed to log performance: \(error.localizedDescription)"
+            print("ClientAssignListVM: Error logging performance (APINetworkError): \(error.localizedDescription)")
+        } catch {
+            self.errorMessage = "An unexpected error occurred while logging performance."
+            print("ClientAssignListVM: Unexpected error logging performance: \(error.localizedDescription)")
+        }
+        // self.isLoading = false
+        if self.errorMessage != nil && previousErrorMessage != nil { /* ... restore error ... */ }
+        return false
+    }
 
     // Method to handle the full video upload process
     func handleVideoUpload(

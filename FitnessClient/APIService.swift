@@ -38,7 +38,7 @@ enum APINetworkError: Error, LocalizedError {
 @MainActor // If this service will publish changes that update UI directly.
            // Otherwise, individual ViewModels can handle MainActor dispatch.
 class APIService: ObservableObject {
-    private let baseURLString = "http://localhost:8080/api/v1" // Your API base URL
+    private let baseURLString = "https://dev-api.fitnessapp.jutechnik.com/api/v1" // Your API base URL
     private let authService: AuthService // Dependency for getting the auth token
 
     // Custom JSONDecoder for consistent date parsing

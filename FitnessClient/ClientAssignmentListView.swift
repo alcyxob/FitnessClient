@@ -29,6 +29,9 @@ struct ClientAssignmentListView: View {
     @State private var uploadingAssignmentId: String? = nil
     @State private var uploadProgress: Double = 0.0
     @State private var uploadMessage: String? = nil // General message for upload status
+    
+    // State to manage which assignment's performance logging UI is expanded
+    @State private var loggingPerformanceForAssignmentId: String? = nil
 
     // Initializer that receives the specific workout and APIService
     init(workout: Workout, apiService: APIService) {
@@ -65,7 +68,7 @@ struct ClientAssignmentListView: View {
             }
             // --- Data Loaded State ---
             else {
-                ForEach(viewModel.assignmentsWithExercises) { assignment in
+                ForEach($viewModel.assignmentsWithExercises) { $assignment in
                     VStack(alignment: .leading, spacing: 8) {
                         // Exercise Name and Action Buttons Row
                         HStack {
@@ -95,17 +98,71 @@ struct ClientAssignmentListView: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
+                        // --- Display Logged Performance (if any) ---
+                        if assignment.achievedSets != nil || assignment.achievedReps != nil || assignment.achievedWeight != nil || assignment.achievedDuration != nil || (assignment.clientPerformanceNotes != nil && !assignment.clientPerformanceNotes!.isEmpty) {
+                            Divider().padding(.vertical, 2)
+                            Text("Logged Performance:")
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(.green)
+                            ParameterRow(label: "Achieved Sets", value: assignment.achievedSets.map { String($0) })
+                            ParameterRow(label: "Achieved Reps", value: assignment.achievedReps)
+                            ParameterRow(label: "Achieved Weight", value: assignment.achievedWeight)
+                            ParameterRow(label: "Achieved Duration", value: assignment.achievedDuration)
+                            if let clientNotes = assignment.clientPerformanceNotes, !clientNotes.isEmpty {
+                                Text("Your Notes:").font(.caption.weight(.medium)).padding(.top, 2)
+                                Text(clientNotes).font(.caption).foregroundColor(.secondary)
+                            }
+                        }
                         // --- Display Trainer Feedback ---
-                         if assignment.status.lowercased() == domain.AssignmentStatus.reviewed.rawValue, // Use enum if available
-                            let feedback = assignment.feedback, !feedback.isEmpty {
-                             Divider().padding(.vertical, 4)
-                             Text("Trainer Feedback:")
-                                 .font(.caption.weight(.semibold))
-                                 .foregroundColor(.blue) // Or your preferred feedback color
-                             Text(feedback)
-                                 .font(.caption)
-                                 .foregroundColor(.blue.opacity(0.9)) // Slightly lighter
-                         }
+                        if assignment.status.lowercased() == domain.AssignmentStatus.reviewed.rawValue,
+                           let feedback = assignment.feedback, !feedback.isEmpty {
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Image(systemName: "text.bubble.fill") // Feedback icon
+                                        .foregroundColor(.accentColor) // Use app's accent color
+                                    Text("Trainer Feedback:")
+                                        .font(.caption.weight(.bold)) // Bolder label
+                                        .foregroundColor(.accentColor)
+                                }
+                                Text(feedback)
+                                    .font(.footnote) // Slightly larger than caption for readability
+                                    .foregroundColor(.secondary) // Good contrast for readability
+                                    .padding(.leading, 5) // Indent feedback text slightly
+                            }
+                            .padding(10) // Padding inside the feedback block
+                            .background(Color.accentColor.opacity(0.1)) // Subtle background highlight
+                            .cornerRadius(8)
+                            .padding(.top, 6) // Space above the feedback block
+                        }
+                        // --- Toggle Button for Logging Performance ---
+                        // Show if assignment is not yet fully reviewed by trainer and performance not yet logged extensively, or allow re-logging
+                        if assignment.status == "completed" || assignment.status == "assigned" || assignment.status == "submitted" {
+                            Button {
+                                withAnimation {
+                                    if loggingPerformanceForAssignmentId == assignment.id {
+                                        loggingPerformanceForAssignmentId = nil // Collapse
+                                    } else {
+                                        loggingPerformanceForAssignmentId = assignment.id // Expand
+                                        // Pre-fill with target if not yet logged
+                                        if assignment.achievedSets == nil && assignment.sets != nil { $assignment.achievedSets.wrappedValue = assignment.sets }
+                                        if assignment.achievedReps == nil && assignment.reps != nil { $assignment.achievedReps.wrappedValue = assignment.reps }
+                                        if assignment.achievedWeight == nil && assignment.weight != nil { $assignment.achievedWeight.wrappedValue = assignment.weight }
+                                        if assignment.achievedDuration == nil && assignment.duration != nil { $assignment.achievedDuration.wrappedValue = assignment.duration }
+                                    }
+                                }
+                            } label: {
+                                Label(loggingPerformanceForAssignmentId == assignment.id ? "Hide Log Form" : "Log Performance",
+                                      systemImage: loggingPerformanceForAssignmentId == assignment.id ? "chevron.up.square" : "square.and.pencil")
+                            }
+                            .font(.caption)
+                            .padding(.top, 5)
+                        }
+
+                        // --- Performance Logging Form (Conditional) ---
+                        if loggingPerformanceForAssignmentId == assignment.id {
+                            performanceLoggingForm(for: $assignment) // Pass binding to assignment
+                        }
                     }
                     .padding(.vertical, 8)
                 }
@@ -174,6 +231,86 @@ struct ClientAssignmentListView: View {
         }
     } // End body
 
+    // --- Helper View for Performance Logging Form ---
+    @ViewBuilder
+    private func performanceLoggingForm(for assignmentBinding: Binding<Assignment>) -> some View {
+        // Use assignmentBinding.wrappedValue to access properties, $assignmentBinding.achievedSets for TextFields
+        let assignment = assignmentBinding.wrappedValue
+        
+        VStack(alignment: .leading, spacing: 8) {
+            Divider()
+            Text("Log Your Performance").font(.headline).padding(.top)
+            
+            HStack {
+                Text("Achieved Sets:")
+                TextField("Sets", text: Binding(
+                    get: { assignmentBinding.achievedSets.wrappedValue.map { String($0) } ?? "" },
+                    set: { assignmentBinding.achievedSets.wrappedValue = Int($0) }
+                ))
+                .keyboardType(.numberPad)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+            }
+            HStack {
+                Text("Achieved Reps:")
+                TextField("Reps", text: Binding(
+                    get: { assignmentBinding.achievedReps.wrappedValue ?? "" },
+                    set: { assignmentBinding.achievedReps.wrappedValue = $0.isEmpty ? nil : $0 }
+                ))
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+            }
+            HStack {
+                Text("Achieved Weight:")
+                TextField("Weight", text: Binding(
+                    get: { assignmentBinding.achievedWeight.wrappedValue ?? "" },
+                    set: { assignmentBinding.achievedWeight.wrappedValue = $0.isEmpty ? nil : $0 }
+                ))
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+            }
+             HStack {
+                Text("Achieved Duration:")
+                TextField("Duration", text: Binding(
+                    get: { assignmentBinding.achievedDuration.wrappedValue ?? "" },
+                    set: { assignmentBinding.achievedDuration.wrappedValue = $0.isEmpty ? nil : $0 }
+                ))
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+            }
+
+            Text("Your Notes (Optional):")
+            TextEditor(text: Binding(
+                get: { assignmentBinding.clientPerformanceNotes.wrappedValue ?? ""},
+                set: { assignmentBinding.clientPerformanceNotes.wrappedValue = $0.isEmpty ? nil : $0 }
+            ))
+            .frame(height: 80)
+            .border(Color.gray.opacity(0.5))
+
+            Button("Save Performance Log") {
+                Task {
+                    let payload = LogPerformancePayload(
+                        achievedSets: assignment.achievedSets, // Use current values from bound assignment
+                        achievedReps: assignment.achievedReps,
+                        achievedWeight: assignment.achievedWeight,
+                        achievedDuration: assignment.achievedDuration,
+                        clientPerformanceNotes: assignment.clientPerformanceNotes
+                    )
+                    let success = await viewModel.logPerformance(for: assignment.id, achievedData: payload)
+                    if success {
+                        loggingPerformanceForAssignmentId = nil // Collapse form on success
+                        // Optionally also mark as completed if not already
+                        if assignment.status == "assigned" {
+                             await viewModel.markAssignmentStatus(assignmentId: assignment.id, newStatus: "completed")
+                        }
+                    }
+                    // Error is handled by viewModel.errorMessage and displayed in main list error area
+                }
+            }
+            .padding(.top)
+            .buttonStyle(.borderedProminent)
+            .disabled(viewModel.isLoading) // Disable if another general list load is happening
+        }
+        .padding(.vertical)
+        .transition(.asymmetric(insertion: .scale.combined(with: .opacity), removal: .opacity)) // Nice animation
+    }
+    
     // --- Helper ViewBuilder function for status and action buttons ---
     @ViewBuilder
     private func statusAndActionButtons(for assignment: Assignment) -> some View {
@@ -330,8 +467,23 @@ struct ClientAssignmentListView_Previews: PreviewProvider {
         // --- MOCK DATA FOR PREVIEW ---
         let mockExercise1 = Exercise(id: "ex1", trainerId: "tPrev", name: "Barbell Squats", createdAt: Date(), updatedAt: Date())
         let mockExercise2 = Exercise(id: "ex2", trainerId: "tPrev", name: "Leg Press", createdAt: Date(), updatedAt: Date())
+        let mockExerciseReviewed = Exercise(id: "exReviewed", trainerId: "tPrev", name: "Reviewed Exercise", createdAt: Date(), updatedAt: Date())
+        let mockExerciseSubmitted = Exercise(id: "exSubmitted", trainerId: "tPrev", name: "Submitted Exercise", createdAt: Date(), updatedAt: Date())
 
         vm.assignmentsWithExercises = [
+            Assignment(id: "a1_reviewed", workoutId: "wPreview1", exerciseId: "exReviewed", assignedAt: Date(),
+                       status: domain.AssignmentStatus.reviewed.rawValue, // Important for preview
+                       sets: 3, reps: "10", rest: "60s", tempo: nil, weight: "Bodyweight", duration: nil, sequence: 0,
+                       trainerNotes: "Make sure to engage your core.",
+                       clientNotes: "This felt pretty good!",
+                       uploadId: "fakeUploadIdClient1",
+                       feedback: "Great job on maintaining form, Alice! For next time, try to go a bit deeper on the squats. Overall, excellent effort!", // Mock feedback
+                       updatedAt: Date(), exercise: mockExerciseReviewed),
+            Assignment(id: "a2_submitted", workoutId: "wPreview1", exerciseId: "exSubmitted", assignedAt: Date(),
+                       status: domain.AssignmentStatus.submitted.rawValue, // So "Upload Video" button won't show
+                       sets: 4, reps: "12", rest: "45s", tempo: nil, weight: "10kg Dumbbells", duration: nil, sequence: 1,
+                       trainerNotes: "Keep elbows slightly tucked.", clientNotes: nil, uploadId: "fakeUploadIdClient2", feedback: nil,
+                       updatedAt: Date(), exercise: mockExerciseSubmitted),
             Assignment(id: "a1", workoutId: "wPreview1", exerciseId: "ex1", assignedAt: Date(),
                        status: domain.AssignmentStatus.reviewed.rawValue, // <<< For previewing feedback
                        sets: 4, reps: "8-10", rest: "90s", tempo: "2010", weight: "100kg", duration: nil, sequence: 0,

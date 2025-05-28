@@ -75,37 +75,57 @@ struct WorkoutListView: View {
             }
             // --- Data Loaded State ---
             else {
-                 ForEach(viewModel.workouts) { workout in
-                     Button {
-                         self.workoutToEdit = workout // Set state to trigger edit sheet
-                     }  label: {
-                         HStack {
-                             // Label: How the workout row looks in the list
-                             VStack(alignment: .leading, spacing: 4) {
-                                 Text(workout.name)
-                                     .font(.headline)
-                                 
+                ForEach(viewModel.workouts) { workout in
+                    // --- THIS IS THE KEY NAVIGATION ---
+                    NavigationLink {
+                        // Destination: AssignmentListView for the selected workout
+                        // This is the trainer's view of assignments in this workout.
+                        AssignmentListView(
+                           workout: workout,
+                           apiService: apiService,
+                           authService: authService // Pass authService
+                        )
+                    } label: {
+                        // Label: How the workout row looks in the list
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(workout.name).font(.headline)
+                            HStack {
                                  if let dayIndex = workout.dayOfWeek, dayIndex > 0 && dayIndex < viewModel.daysOfWeek.count {
                                      Text("Day: \(viewModel.daysOfWeek[dayIndex])")
-                                         .font(.caption)
-                                         .foregroundColor(.blue)
+                                         .font(.caption).foregroundColor(.blue)
                                  }
-                                 Text("Seq: \(workout.sequence)") // Display sequence
-                                     .font(.caption)
-                                     .foregroundColor(.purple)
-                                 
-                                 if let notes = workout.notes, !notes.isEmpty {
-                                     Text(notes)
-                                         .font(.caption)
-                                         .foregroundColor(.gray)
-                                         .lineLimit(1) // Show a snippet of notes
-                                 }
-                             }
-                         }
-                         .padding(.vertical, 5)
-                     }
-                     .buttonStyle(.plain)// End Label
-                 } // End ForEach
+                                 Text("Order: \(workout.sequence + 1)") // Display 1-based sequence
+                                    .font(.caption).foregroundColor(.purple)
+                            }
+                            if let notes = workout.notes, !notes.isEmpty {
+                                Text(notes)
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .padding(.vertical, 5)
+                    } // End Label
+                    // --- Add Context Menu for Editing/Deleting the Workout itself ---
+                    .contextMenu {
+                        Button {
+                            print("Context Menu: Edit Workout \(workout.id)")
+                            self.workoutToEdit = workout // Trigger edit sheet
+                        } label: {
+                            Label("Edit Workout Details", systemImage: "pencil")
+                        }
+
+                        Button(role: .destructive) {
+                            print("Context Menu: Delete Workout \(workout.id)")
+                            Task {
+                                await viewModel.deleteWorkout(workoutId: workout.id)
+                                // List will refresh or ViewModel updates optimistically
+                            }
+                        } label: {
+                            Label("Delete Workout", systemImage: "trash")
+                        }
+                    }
+                }// End ForEach
                 .onDelete(perform: deleteWorkouts)
             } // End Else (Data Loaded)
         } // End List

@@ -84,14 +84,6 @@ class ProvideFeedbackViewModel: ObservableObject {
 // Helper: Assuming you have a domain.AssignmentStatus enum in Swift matching Go
 // If not, you'll use raw strings like "reviewed", "assigned".
 // This could be in Models.swift
-enum domain { // Mocking the namespace for clarity
-    enum AssignmentStatus: String, CaseIterable, Identifiable {
-        case assigned = "assigned"
-        case completed = "completed" // Client sets this
-        case submitted = "submitted" // Client sets this after video upload
-        case reviewed = "reviewed"   // Trainer sets this
-        // case needsRevision = "needs_revision" // Example for trainer
-
-        var id: String { self.rawValue }
-    }
-}
+//enum domain { // Mocking the namespace for clarity
+//
+//}

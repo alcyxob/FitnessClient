@@ -8,9 +8,22 @@ struct MainTabView: View {
     var body: some View {
         TabView {
             // --- Tab 1: Home/Dashboard ---
-            VStack { /* ... home tab content ... */ }
-            .tabItem { Label("Home", systemImage: "house.fill") }
-            .tag(0)
+            if authService.loggedInUser?.role == "client" {
+                ClientDashboardView(apiService: apiService, authService: authService) // Pass services
+                    .tabItem { Label("Today", systemImage: "figure.mixed.cardio") } // "Today" or "Home"
+                    .tag(0)
+            } else if authService.loggedInUser?.role == "trainer" {
+                // Trainer's Home/Dashboard (Placeholder for now)
+                TrainerDashboardView(apiService: apiService, authService: authService) // Pass services
+                    .tabItem { Label("Dashboard", systemImage: "list.clipboard.fill") } // Icon for dashboard
+                    .tag(0)
+            } else {
+                // Fallback if role is unknown or user is nil (shouldn't happen if RootView works)
+                Text("Welcome")
+                    .tabItem { Label("Home", systemImage: "house.fill") }
+                    .tag(0)
+            }
+            // --- END UPDATED HOME TAB ---
 
             // --- Tab 2: Role-Specific Primary View ---
             if authService.loggedInUser?.role == "trainer" {

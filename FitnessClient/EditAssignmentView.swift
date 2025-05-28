@@ -7,9 +7,17 @@ struct EditAssignmentView: View {
 
     // Focus state can be reused from AddExerciseToWorkoutView if similar fields
     enum Field: Hashable {
-        case sets, reps, rest, tempo, weight, duration, notes, sequence
+        case name, description, muscleGroup, executionTechnic, videoUrl, sequence, sets, reps, rest, tempo, weight, duration, notes
     }
     @FocusState private var focusedField: Field?
+    
+    static private var displayIntegerFormatter: NumberFormatter = { // Renamed for clarity
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal // Good for display
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 0
+        return formatter
+    }()
 
     init(assignmentToEdit: Assignment, apiService: APIService) {
         _viewModel = StateObject(wrappedValue: EditAssignmentViewModel(assignmentToEdit: assignmentToEdit, apiService: apiService))
@@ -28,9 +36,12 @@ struct EditAssignmentView: View {
                     } else {
                         // Picker to potentially change the exercise
                         Picker("Exercise", selection: $viewModel.selectedExerciseId) {
-                            Text("Select an Exercise").tag(String.self) // Placeholder if nothing selected
+                            Text("Select an Exercise")
+                                .tag(String?.none) // <<< FIX 1: Use nil for the "no selection" tag
+
                             ForEach(viewModel.availableExercises) { exercise in
-                                Text(exercise.name).tag(exercise.id)
+                                Text(exercise.name)
+                                    .tag(Optional(exercise.id)) // <<< FIX 2: Tag with Optional(exercise.id)
                             }
                         }
                         // Display current exercise name if not editing via picker, or picker is empty
@@ -42,50 +53,14 @@ struct EditAssignmentView: View {
                     }
                 }
 
-
                 Section("Parameters") {
-                    HStack {
-                        Text("Sequence")
-                        Spacer()
-                        TextField("Order", value: $viewModel.assignment.sequence, format: .number)
-                            .keyboardType(.numberPad).multilineTextAlignment(.trailing).focused($focusedField, equals: .sequence)
-                            .frame(width: 80)
-                    }
-                    HStack {
-                        Text("Sets")
-                        Spacer()
-                        // Bind to Int? for sets
-                        TextField("e.g., 3", text: Binding(
-                            get: { viewModel.assignment.sets.map { String($0) } ?? "" },
-                            set: { viewModel.assignment.sets = Int($0) }
-                        ))
-                        .keyboardType(.numberPad).multilineTextAlignment(.trailing).focused($focusedField, equals: .sets)
-                        .frame(width: 80)
-                    }
-                    TextField("Reps (e.g., 8-12)", text: Binding(
-                        get: { viewModel.assignment.reps ?? "" },
-                        set: { viewModel.assignment.reps = $0.isEmpty ? nil : $0 }
-                    )).focused($focusedField, equals: .reps)
-                    
-                    TextField("Rest (e.g., 60s)", text: Binding(
-                        get: { viewModel.assignment.rest ?? "" },
-                        set: { viewModel.assignment.rest = $0.isEmpty ? nil : $0 }
-                    )).focused($focusedField, equals: .rest)
-
-                    TextField("Tempo (e.g., 2010)", text: Binding(
-                        get: { viewModel.assignment.tempo ?? "" },
-                        set: { viewModel.assignment.tempo = $0.isEmpty ? nil : $0 }
-                    )).focused($focusedField, equals: .tempo)
-
-                    TextField("Weight/Intensity", text: Binding(
-                        get: { viewModel.assignment.weight ?? "" },
-                        set: { viewModel.assignment.weight = $0.isEmpty ? nil : $0 }
-                    )).focused($focusedField, equals: .weight)
-
-                    TextField("Duration (e.g., 30min)", text: Binding(
-                        get: { viewModel.assignment.duration ?? "" },
-                        set: { viewModel.assignment.duration = $0.isEmpty ? nil : $0 }
-                    )).focused($focusedField, equals: .duration)
+                    sequenceField
+                    setsField
+                    repsField
+                    restField
+                    tempoField
+                    weightField
+                    durationField
                 }
 
                 Section("Trainer Notes (Optional)") {
@@ -100,14 +75,15 @@ struct EditAssignmentView: View {
                 Section {
                     if viewModel.isLoading {
                         ProgressView("Saving Changes...")
+                            .frame(maxWidth: .infinity, alignment: .center)
                     } else {
                         Button("Save Changes") {
                             focusedField = nil
                             Task { await viewModel.saveChanges() }
                         }
                         .disabled(!viewModel.canSaveChanges)
+                        .frame(maxWidth: .infinity, alignment: .center)
                     }
-                    .frame(maxWidth: .infinity, alignment: .center)
                 }
 
                 if let errorMessage = viewModel.errorMessage {
@@ -136,6 +112,81 @@ struct EditAssignmentView: View {
             // .onSubmit { ... handle keyboard next ... }
         } // End NavigationView
     }
+    
+    // --- HELPER COMPUTED PROPERTIES FOR PARAMETER FIELDS ---
+    @ViewBuilder
+    private var sequenceField: some View {
+        HStack {
+            Text("Sequence")
+            Spacer()
+            TextField("Order", text: Binding(
+                get: { String(viewModel.assignment.sequence) },
+                set: { viewModel.assignment.sequence = Int($0) ?? 0 }
+            ))
+            .keyboardType(.numberPad)
+            .multilineTextAlignment(.trailing)
+            .focused($focusedField, equals: .sequence)
+            .frame(width: 80)
+        }
+    }
+
+    @ViewBuilder
+    private var setsField: some View {
+        HStack {
+            Text("Sets")
+            Spacer()
+            TextField("e.g., 3", text: Binding(
+                get: { viewModel.assignment.sets.map { String($0) } ?? "" },
+                set: { viewModel.assignment.sets = Int($0) }
+            ))
+            .keyboardType(.numberPad)
+            .multilineTextAlignment(.trailing)
+            .focused($focusedField, equals: .sets)
+            .frame(width: 80)
+        }
+    }
+
+    @ViewBuilder
+    private var repsField: some View {
+        TextField("Reps (e.g., 8-12)", text: Binding(
+            get: { viewModel.assignment.reps ?? "" },
+            set: { viewModel.assignment.reps = $0.isEmpty ? nil : $0 }
+        )).focused($focusedField, equals: .reps)
+    }
+
+    @ViewBuilder
+    private var restField: some View {
+        TextField("Rest (e.g., 60s)", text: Binding(
+            get: { viewModel.assignment.rest ?? "" },
+            set: { viewModel.assignment.rest = $0.isEmpty ? nil : $0 }
+        )).focused($focusedField, equals: .rest)
+    }
+
+    @ViewBuilder
+    private var tempoField: some View {
+        TextField("Tempo (e.g., 2010)", text: Binding(
+            get: { viewModel.assignment.tempo ?? "" },
+            set: { viewModel.assignment.tempo = $0.isEmpty ? nil : $0 }
+        )).focused($focusedField, equals: .tempo)
+    }
+
+    @ViewBuilder
+    private var weightField: some View {
+        TextField("Weight/Intensity", text: Binding(
+            get: { viewModel.assignment.weight ?? "" },
+            set: { viewModel.assignment.weight = $0.isEmpty ? nil : $0 }
+        )).focused($focusedField, equals: .weight)
+    }
+
+    @ViewBuilder
+    private var durationField: some View {
+        TextField("Duration (e.g., 30min)", text: Binding(
+            get: { viewModel.assignment.duration ?? "" },
+            set: { viewModel.assignment.duration = $0.isEmpty ? nil : $0 }
+        )).focused($focusedField, equals: .duration)
+    }
+    // --- END HELPER COMPUTED PROPERTIES ---
+
 }
 
 // Preview Provider

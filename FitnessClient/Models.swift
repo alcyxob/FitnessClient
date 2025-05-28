@@ -97,14 +97,20 @@ struct Assignment: Codable, Identifiable, Hashable, Equatable { // Added Equatab
     let status: String // Consider making this an enum later
     
     // Exercise Execution Details specific to this assignment instance
-    let sets: Int?
-    let reps: String?
-    let rest: String?
-    let tempo: String?
-    let weight: String?
-    let duration: String?
-    let sequence: Int
-    let trainerNotes: String?
+    var sets: Int?
+    var reps: String?
+    var rest: String?
+    var tempo: String?
+    var weight: String?
+    var duration: String?
+    var sequence: Int
+    var trainerNotes: String?
+    
+    var achievedSets: Int?                // 'var' and optional
+    var achievedReps: String?             // 'var' and optional
+    var achievedWeight: String?           // 'var' and optional
+    var achievedDuration: String?         // 'var' and optional
+    var clientPerformanceNotes: String?   // 'var' and optional
     
     // Client Tracking
     let clientNotes: String?
@@ -219,3 +225,48 @@ struct SubmitFeedbackPayload: Codable {
     let feedback: String? // Backend might allow empty feedback if only status changes
     let status: String   // The new status (e.g., "reviewed", "assigned")
 }
+
+// Payload for logging performance
+struct LogPerformancePayload: Codable {
+    var achievedSets: Int?
+    var achievedReps: String?
+    var achievedWeight: String?
+    var achievedDuration: String?
+    var clientPerformanceNotes: String?
+    // var status: String? // If logging also changes status, add this
+}
+
+// Matches Go API's ClientReviewStatusResponse DTO
+struct ClientReviewStatusItem: Codable, Identifiable {
+    let clientId: String   // Use 'id' for Identifiable conformance on this specific ID
+    let clientName: String
+    let pendingReviewCount: Int
+    // let lastSubmissionDate: Date? // Optional, if you add it to backend DTO
+
+    // Make clientId the identifiable ID for this struct
+    var id: String { clientId }
+
+    // CodingKeys if your JSON keys differ (e.g., if backend sends client_id)
+    // enum CodingKeys: String, CodingKey {
+    //     case clientId = "client_id" // Example
+    //     case clientName, pendingReviewCount
+    // }
+}
+
+enum domain {
+    enum Role: String, Codable, CaseIterable, Identifiable {
+        case trainer = "trainer"
+        case client = "client"
+        var id: String { self.rawValue }
+    }
+    
+    enum AssignmentStatus: String, CaseIterable, Identifiable {
+        case assigned = "assigned"
+        case completed = "completed" // Client sets this
+        case submitted = "submitted" // Client sets this after video upload
+        case reviewed = "reviewed"   // Trainer sets this
+        // case needsRevision = "needs_revision" // Example for trainer
+
+        var id: String { self.rawValue }
+    }
+ }
