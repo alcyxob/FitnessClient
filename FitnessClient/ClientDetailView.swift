@@ -9,6 +9,7 @@ struct ClientDetailView: View {
     // Services obtained from the environment, passed to sub-views.
     @EnvironmentObject var apiService: APIService
     @EnvironmentObject var authService: AuthService
+    @EnvironmentObject var toastManager: ToastManager
 
     // State for presenting the "Create Training Plan" sheet.
     @State private var showingCreatePlanSheet = false
@@ -134,7 +135,8 @@ struct ClientDetailView: View {
                     // Ensure client object is available before presenting sheet that needs it
                     CreateTrainingPlanView(
                         client: client, // Pass the fully loaded client object
-                        apiService: apiService
+                        apiService: apiService,
+                        toastManager: toastManager
                     )
                 }
                 .refreshable { // Pull to refresh for the list of plans

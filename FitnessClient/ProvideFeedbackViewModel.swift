@@ -24,15 +24,17 @@ class ProvideFeedbackViewModel: ObservableObject {
     let assignment: Assignment // The assignment feedback is for
     private let apiService: APIService
     // No need for authService directly if APIService handles token
+    private let toastManager: ToastManager
 
     var canSubmitFeedback: Bool {
         // Feedback can be empty if only changing status, but status must be selected.
         !selectedStatus.isEmpty && !isLoading
     }
 
-    init(assignment: Assignment, apiService: APIService) {
+    init(assignment: Assignment, apiService: APIService, toastManager: ToastManager) {
         self.assignment = assignment
         self.apiService = apiService
+        self.toastManager = toastManager
         // Default to "reviewed" if current status is "submitted", otherwise keep current or offer options
         if assignment.status.lowercased() == domain.AssignmentStatus.submitted.rawValue {
             self.selectedStatus = domain.AssignmentStatus.reviewed.rawValue
@@ -68,6 +70,7 @@ class ProvideFeedbackViewModel: ObservableObject {
             print("ProvideFeedbackVM: Successfully submitted feedback. New status: \(updatedAssignment.status)")
             isLoading = false
             didSubmitSuccessfully = true
+            toastManager.showToast(style: .success, message: "Feedback submitted for '\(updatedAssignment.exercise?.name ?? "exercise")'!")
 
         } catch let error as APINetworkError {
             self.errorMessage = error.localizedDescription

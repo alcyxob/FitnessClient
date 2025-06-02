@@ -8,6 +8,7 @@ struct ClientWorkoutsView: View {
     // Services from environment, if needed to pass to further navigated views
     @EnvironmentObject var apiService: APIService
     // @EnvironmentObject var authService: AuthService
+    @EnvironmentObject var toastManager: ToastManager
 
     // Initializer that receives the specific trainingPlan and APIService
     init(trainingPlan: TrainingPlan, apiService: APIService) {
@@ -46,7 +47,8 @@ struct ClientWorkoutsView: View {
                     NavigationLink {
                         ClientAssignmentListView( // Navigate to the new view
                            workout: workout,
-                           apiService: apiService // Pass APIService from environment
+                           apiService: apiService, // Pass APIService from environment
+                           toastManager: toastManager
                         )
                     } label: {
                         VStack(alignment: .leading, spacing: 4) {

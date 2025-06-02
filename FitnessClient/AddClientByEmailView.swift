@@ -5,9 +5,9 @@ struct AddClientByEmailView: View {
     @StateObject var viewModel: AddClientViewModel
     @Environment(\.dismiss) var dismiss // To close the sheet
 
-    init(apiService: APIService) {
+    init(apiService: APIService, toastManager: ToastManager) {
         // View creates its own ViewModel instance
-        _viewModel = StateObject(wrappedValue: AddClientViewModel(apiService: apiService))
+        _viewModel = StateObject(wrappedValue: AddClientViewModel(apiService: apiService, toastManager: toastManager))
     }
 
     var body: some View {
@@ -76,7 +76,8 @@ struct AddClientByEmailView: View {
 struct AddClientByEmailView_Previews: PreviewProvider {
     static var previews: some View {
          let mockAuth = AuthService()
+        let mockToast = ToastManager()
          // mockAuth.authToken = "fake" // Simulate login if needed by API Service init
-         AddClientByEmailView(apiService: APIService(authService: mockAuth))
+        AddClientByEmailView(apiService: APIService(authService: mockAuth), toastManager: mockToast)
     }
 }

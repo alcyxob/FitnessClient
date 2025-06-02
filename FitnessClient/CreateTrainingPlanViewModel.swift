@@ -23,15 +23,17 @@ class CreateTrainingPlanViewModel: ObservableObject {
     // Dependencies
     let client: UserResponse // The client this plan is for
     private let apiService: APIService
+    private let toastManager: ToastManager
 
     // Computed property for validation
     var canCreatePlan: Bool {
         !planName.isEmpty && !isLoading
     }
 
-    init(client: UserResponse, apiService: APIService) {
+    init(client: UserResponse, apiService: APIService, toastManager: ToastManager) {
         self.client = client
         self.apiService = apiService
+        self.toastManager = toastManager
     }
 
     func createTrainingPlan() async {
@@ -66,7 +68,7 @@ class CreateTrainingPlanViewModel: ObservableObject {
             print("CreatePlanVM: Successfully created plan ID: \(createdPlan.id)")
             isLoading = false
             didCreateSuccessfully = true // Signal success to the view
-
+            toastManager.showToast(style: .success, message: "Plan '\(createdPlan.name)' created!")
         } catch let error as APINetworkError {
             self.errorMessage = error.localizedDescription
             print("CreatePlanVM: Error creating plan (APINetworkError): \(error.localizedDescription)")

@@ -9,6 +9,7 @@ struct AssignmentListView: View {
     // Services obtained from the environment, passed to presented sheets/views.
     @EnvironmentObject var apiService: APIService
     @EnvironmentObject var authService: AuthService
+    @EnvironmentObject var toastManager: ToastManager
 
     // State for presenting sheets
     @State private var showingAddExerciseSheet = false
@@ -84,7 +85,8 @@ struct AssignmentListView: View {
         .sheet(item: $assignmentForFeedback, onDismiss: refreshDataAfterSheet) { currentAssignmentForFeedback in
             ProvideFeedbackView( // Assumes this view is defined elsewhere
                 assignment: currentAssignmentForFeedback,
-                apiService: apiService
+                apiService: apiService,
+                toastManager: toastManager
             )
         }
         .onAppear {

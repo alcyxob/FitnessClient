@@ -5,10 +5,11 @@ struct CreateTrainingPlanView: View {
     // Create the ViewModel specific to this instance of the view
     @StateObject var viewModel: CreateTrainingPlanViewModel
     @Environment(\.dismiss) var dismiss // To close the sheet
+    @EnvironmentObject var toastManager: ToastManager
 
     // Initializer takes dependencies needed by the ViewModel
-    init(client: UserResponse, apiService: APIService) {
-        _viewModel = StateObject(wrappedValue: CreateTrainingPlanViewModel(client: client, apiService: apiService))
+    init(client: UserResponse, apiService: APIService, toastManager: ToastManager) {
+        _viewModel = StateObject(wrappedValue: CreateTrainingPlanViewModel(client: client, apiService: apiService, toastManager: toastManager))
     }
 
     var body: some View {
@@ -109,9 +110,11 @@ struct CreateTrainingPlanView_Previews: PreviewProvider {
     static var previews: some View {
         let mockAuth = AuthService()
         let mockAPI = APIService(authService: mockAuth)
+        let mockToast = ToastManager()
         let previewClient = UserResponse(id: "clientPreview123", name: "Alice Preview", email: "alice@preview.com", role: "client", createdAt: Date(), clientIds: nil, trainerId: "trainerPreview456")
 
-        CreateTrainingPlanView(client: previewClient, apiService: mockAPI)
+        CreateTrainingPlanView(client: previewClient, apiService: mockAPI, toastManager: mockToast)
+            .environmentObject(mockToast)
             // Provide environment objects if any sub-sub-views needed them (unlikely here)
             // .environmentObject(mockAPI)
             // .environmentObject(mockAuth)

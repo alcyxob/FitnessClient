@@ -10,9 +10,11 @@ class AddClientViewModel: ObservableObject {
     @Published var didAddClientSuccessfully = false // To signal success
 
     private let apiService: APIService
+    private let toastManager: ToastManager
 
-    init(apiService: APIService) {
-        self.apiService = apiService
+    init(apiService: APIService, toastManager: ToastManager) {
+        self.apiService = apiService;
+        self.toastManager = toastManager
     }
 
     func addClient() async {
@@ -34,6 +36,7 @@ class AddClientViewModel: ObservableObject {
             print("ViewModel: Successfully added client: \(addedClient.email)")
             isLoading = false
             didAddClientSuccessfully = true // Signal success
+            toastManager.showToast(style: .success, message: "Client '\(addedClient.name)' added!")
 
         } catch let error as APINetworkError {
             // More specific error handling based on status code if needed

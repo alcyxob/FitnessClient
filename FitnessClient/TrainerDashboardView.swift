@@ -29,8 +29,13 @@ struct TrainerDashboardView: View {
                     Spacer()
                 } else if let errorMessage = viewModel.errorMessage, viewModel.clientsWithPendingReviews.isEmpty {
                     Spacer()
-                    VStack(spacing: 10) { /* ... Error View ... */ }
-                        .padding().frame(maxWidth: .infinity)
+                    VStack(spacing: 15) {
+                        Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 50)).foregroundColor(.orange)
+                        Text("Error Loading Dashboard").font(.title3).fontWeight(.semibold)
+                        Text(errorMessage).font(.callout).foregroundColor(.secondary).multilineTextAlignment(.center).padding(.horizontal)
+                        Button("Retry") { Task { await viewModel.fetchPendingReviews() }}
+                            .buttonStyle(.borderedProminent).padding(.top)
+                    }.padding()
                     Spacer()
                 } else if viewModel.clientsWithPendingReviews.isEmpty {
                     Spacer()
@@ -51,36 +56,29 @@ struct TrainerDashboardView: View {
                     List {
                         ForEach(viewModel.clientsWithPendingReviews) { item in
                             NavigationLink {
-                                // TODO: Navigate to a specific client's submitted assignments view or ClientDetailView
-                                // For now, let's go to ClientDetailView.
-                                // We need the full UserResponse object for the client.
-                                // The dashboard only returns ClientReviewStatusItem.
-                                // We might need to fetch UserResponse or pass enough info.
-                                // For simplicity, let's assume we have a way to construct a UserResponse or just pass ID.
-                                // A better approach: dashboard endpoint returns enough User info or ID to fetch.
-                                
-                                // Assuming ClientDetailView can be initialized with just clientID
-                                // and fetch details, OR modify dashboard DTO to include more.
-                                // Let's just show a placeholder for now.
-                                Text("Detail for \(item.clientName) (ID: \(item.clientId)) - TODO: Navigate to their submissions")
-                                    .onAppear {
-                                        print("Navigating to details for client: \(item.clientName)")
-                                    }
-                                
-                                // Ideal (if ClientDetailView had an init(clientId: ...)):
-                                // ClientDetailView(clientId: item.clientId, apiService: apiService, authService: authService)
-
+                                ClientDetailView(
+                                    clientId: item.clientId, // From ClientReviewStatusItem
+                                    apiService: apiService,
+                                    authService: authService
+                                )
                             } label: {
                                 HStack {
                                     VStack(alignment: .leading) {
                                         Text(item.clientName).font(.headline)
                                         Text("\(item.pendingReviewCount) item(s) to review")
-                                            .font(.caption).foregroundColor(.orange)
+                                            .font(.caption)
+                                            .foregroundColor(item.pendingReviewCount > 0 ? .orange : .secondary)
+                                            .fontWeight(item.pendingReviewCount > 0 ? .semibold : .regular)
                                     }
                                     Spacer()
+                                    if item.pendingReviewCount > 0 {
+                                        Image(systemName: "exclamationmark.bubble.fill") // Visual cue
+                                            .foregroundColor(.orange)
+                                    }
                                     Image(systemName: "chevron.right")
                                         .foregroundColor(.secondary.opacity(0.5))
                                 }
+                                .padding(.vertical, 4)
                             }
                         }
                     }
@@ -106,27 +104,69 @@ struct TrainerDashboardView: View {
 
 // Preview Provider
 struct TrainerDashboardView_Previews: PreviewProvider {
+    // This helper function creates an instance of TrainerDashboardView
+    // using its standard initializer.
     static func createPreviewInstance() -> some View {
-        let mockAuth = AuthService()
-        mockAuth.authToken = "trainer_token_preview"
-        mockAuth.loggedInUser = UserResponse(id: "t_dash_prev", name: "Dr. Train", email: "trainer@example.com", role: "trainer", createdAt: Date(), clientIds: nil, trainerId: nil)
-        let mockAPI = APIService(authService: mockAuth)
+        let mockAuthService = AuthService()
+        mockAuthService.authToken = "trainer_token_preview"
+        mockAuthService.loggedInUser = UserResponse(
+            id: "t_dash_prev",
+            name: "Dr. Train",
+            email: "trainer@example.com",
+            role: "trainer",
+            createdAt: Date(),
+            clientIds: nil, // Ensure all UserResponse fields are provided
+            trainerId: nil  // Ensure all UserResponse fields are provided
+        )
         
-        let vm = TrainerDashboardViewModel(apiService: mockAPI, authService: mockAuth)
-        // vm.clientsWithPendingReviews = [
-        //    ClientReviewStatusItem(clientId: "c1", clientName: "Client Alpha", pendingReviewCount: 3),
-        //    ClientReviewStatusItem(clientId: "c2", clientName: "Client Beta", pendingReviewCount: 1)
-        // ]
-        // vm.isLoading = true
-        // vm.errorMessage = "Preview: Error loading dashboard"
-
-        // As the view creates its own VM, this preview will show loading.
-        // To show data, use a mock APIService.
-        return TrainerDashboardView(apiService: mockAPI, authService: mockAuth)
-            .environmentObject(mockAPI)
-            .environmentObject(mockAuth)
+        let mockAPIService = APIService(authService: mockAuthService)
+        
+        // When TrainerDashboardView is initialized, its internal ViewModel
+        // will use mockAPIService. If mockAPIService is not a true mock
+        // that handles "/trainer/dashboard/pending-reviews", the preview
+        // will show the loading state, then an error or empty state from the API call.
+        
+        return TrainerDashboardView(
+                apiService: mockAPIService,
+                authService: mockAuthService
+            )
+            .environmentObject(mockAPIService) // For sub-views if needed
+            .environmentObject(mockAuthService)
     }
+
     static var previews: some View {
         createPreviewInstance()
+            .previewDisplayName("Default Load Sequence")
+        
+        // To demonstrate different states in preview *without* live API calls,
+        // you would typically:
+        // 1. Modify TrainerDashboardView to have an init(viewModel: TrainerDashboardViewModel).
+        // 2. Create and configure TrainerDashboardViewModel instances with mock data/states.
+        // 3. Pass those ViewModels to TrainerDashboardView in the preview.
+        //
+        // Example if you add init(viewModel: TrainerDashboardViewModel) to TrainerDashboardView:
+        /*
+        static func createDataLoadedPreview() -> some View {
+            let mockAuth = AuthService(); /* ... */
+            let mockAPI = APIService(authService: mockAuth);
+            let vm = TrainerDashboardViewModel(apiService: mockAPI, authService: mockAuth)
+            vm.clientsWithPendingReviews = [
+                ClientReviewStatusItem(clientId: "c1", clientName: "Client Alpha (Preview)", pendingReviewCount: 3),
+                ClientReviewStatusItem(clientId: "c2", clientName: "Client Beta (Preview)", pendingReviewCount: 1)
+            ]
+            vm.isLoading = false
+            vm.errorMessage = nil
+            return TrainerDashboardView(viewModel: vm) // Assumes init(viewModel:) exists
+                .environmentObject(mockAPI)
+                .environmentObject(mockAuth)
+        }
+
+        static var previews: some View {
+            Group {
+                createPreviewInstance().previewDisplayName("Default Load") // Shows loading, then API result
+                // createDataLoadedPreview().previewDisplayName("With Mock Data") // Shows predefined data
+            }
+        }
+        */
     }
 }

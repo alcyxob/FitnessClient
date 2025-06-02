@@ -19,6 +19,7 @@ struct ClientAssignmentListView: View {
     // Services from environment, if needed for any actions from this view later
     @EnvironmentObject var apiService: APIService
     // @EnvironmentObject var authService: AuthService // Less likely needed directly here
+    @EnvironmentObject var toastManager: ToastManager
 
     // State for PhotosPicker
     @State private var selectedPhotoItem: PhotosPickerItem? = nil
@@ -34,8 +35,12 @@ struct ClientAssignmentListView: View {
     @State private var loggingPerformanceForAssignmentId: String? = nil
 
     // Initializer that receives the specific workout and APIService
-    init(workout: Workout, apiService: APIService) {
-        _viewModel = StateObject(wrappedValue: ClientAssignmentListViewModel(workout: workout, apiService: apiService))
+    init(workout: Workout, apiService: APIService, toastManager: ToastManager) {
+        _viewModel = StateObject(wrappedValue: ClientAssignmentListViewModel(
+            workout: workout,
+            apiService: apiService,
+            toastManager: toastManager // Pass it to the VM
+        ))
         print("ClientAssignmentListView: Initialized for workout: \(workout.name)")
     }
 
@@ -455,10 +460,11 @@ struct ClientAssignmentListView_Previews: PreviewProvider {
         mockAuth.authToken = "fake_client_token"
         mockAuth.loggedInUser = UserResponse(id: "clientPrev", name: "Client Preview", email: "c@p.com", role: "client", createdAt: Date(), clientIds: nil, trainerId: "tPrev")
         let mockAPI = APIService(authService: mockAuth)
+        let mockToast = ToastManager();
         
         let previewWorkout = Workout(id: "wPreview1", trainingPlanId: "tpPreview1", trainerId: "tPrev", clientId: "clientPrev", name: "Leg Day Preview", dayOfWeek: 2, notes: "Remember to stretch!", sequence: 0, createdAt: Date(), updatedAt: Date())
 
-        let vm = ClientAssignmentListViewModel(workout: previewWorkout, apiService: mockAPI)
+        let vm = ClientAssignmentListViewModel(workout: previewWorkout, apiService: mockAPI, toastManager: mockToast)
         let ex1 = Exercise(id: "ex1", trainerId: "tPrev", name: "Barbell Squats", createdAt: Date(), updatedAt: Date())
         vm.assignmentsWithExercises = [
             Assignment(id: "a1", workoutId: "wPreview1", exerciseId: "ex1", assignedAt: Date(), status: "completed", sets: 4, reps: "8-10", rest: "90s", tempo: "2010", weight: "100kg", duration: nil, sequence: 0, trainerNotes: "Go deep!", clientNotes: nil, uploadId: nil, feedback: nil, updatedAt: Date(), exercise: ex1)
@@ -506,10 +512,11 @@ struct ClientAssignmentListView_Previews: PreviewProvider {
         // --- END MOCK DATA ---
 
         return NavigationView {
-            ClientAssignmentListView(workout: previewWorkout, apiService: mockAPI) // Pass the pre-configured VM
+            ClientAssignmentListView(workout: previewWorkout, apiService: mockAPI, toastManager: mockToast) // Pass the pre-configured VM
         }
         .environmentObject(mockAPI)
         .environmentObject(mockAuth)
+        .environmentObject(mockToast);
     }
 
     static var previews: some View {

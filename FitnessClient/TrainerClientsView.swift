@@ -10,6 +10,7 @@ struct TrainerClientsView: View {
     // to presented sheets or navigated views.
     @EnvironmentObject var apiService: APIService
     @EnvironmentObject var authService: AuthService
+    @EnvironmentObject var toastManager: ToastManager
 
     // State to control the presentation of the "Add Client" sheet.
     @State private var showingAddClientSheet = false
@@ -129,7 +130,7 @@ struct TrainerClientsView: View {
                    }) {
                 // The View to present as a sheet
                 // Pass the required APIService from the environment
-                AddClientByEmailView(apiService: apiService)
+                AddClientByEmailView(apiService: apiService, toastManager: toastManager)
             }
             .onAppear {
                 // Action when the view first appears

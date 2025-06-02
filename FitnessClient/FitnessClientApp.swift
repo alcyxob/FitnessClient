@@ -14,6 +14,7 @@ struct FitnessClientApp: App {
     @StateObject private var authService = AuthService()
     // Create APIService, injecting AuthService
     @StateObject private var apiService: APIService
+    @StateObject private var toastManager = ToastManager()
 
     init() {
         // Initialize authService first as apiService depends on it
@@ -28,6 +29,8 @@ struct FitnessClientApp: App {
             RootView() // We will create RootView next
                 .environmentObject(authService) // Make authService available to RootView and its children
                 .environmentObject(apiService) // Make apiService available
+                .environmentObject(toastManager)
+                .toastView(toast: $toastManager.currentToast) // <<< APPLY MODIFIER
         }
     }
 }

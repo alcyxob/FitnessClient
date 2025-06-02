@@ -12,10 +12,12 @@ class ClientAssignmentListViewModel: ObservableObject {
     let workout: Workout // The workout these assignments belong to
     private let apiService: APIService
     // No direct need for AuthService here if client ID for auth is handled by APIService token
+    private let toastManager: ToastManager
 
-    init(workout: Workout, apiService: APIService) {
+    init(workout: Workout, apiService: APIService, toastManager: ToastManager) {
         self.workout = workout
         self.apiService = apiService
+        self.toastManager = toastManager
         print("ClientAssignListVM: Initialized for workout: \(workout.name) (\(workout.id))")
     }
 
@@ -73,9 +75,10 @@ class ClientAssignmentListViewModel: ObservableObject {
 
 
     // Method for client to mark their assignment status
-    func markAssignmentStatus(assignmentId: String, newStatus: String) async {
+    func markAssignmentStatus(assignmentId: String, newStatus: String) async -> Bool {
         print("ClientAssignListVM: Marking assignment \(assignmentId) as \(newStatus)")
         self.errorMessage = nil // Clear previous errors specific to this action
+        var success = false // Track success
 
         let endpoint = "/client/assignments/\(assignmentId)/status"
         let payload = UpdateAssignmentStatusPayload(status: newStatus)
@@ -101,7 +104,13 @@ class ClientAssignmentListViewModel: ObservableObject {
                 await self.fetchMyAssignmentsForWorkout() // <<< CORRECTED
             }
             print("ClientAssignListVM: Assignment \(assignmentId) status updated to \(newStatus) successfully.")
-
+            // --- SUCCESS TOAST ---
+            if newStatus == domain.AssignmentStatus.completed.rawValue {
+                toastManager.showToast(style: .success, message: "Exercise marked complete!")
+            } else {
+                toastManager.showToast(style: .success, message: "Status updated to \(newStatus.capitalized)!")
+            }
+            success = true
         } catch let error as APINetworkError {
             self.errorMessage = "Failed to update status: \(error.localizedDescription)"
             print("ClientAssignListVM: Error updating assignment status (APINetworkError): \(error.localizedDescription)")
@@ -112,6 +121,7 @@ class ClientAssignmentListViewModel: ObservableObject {
             print("ClientAssignListVM: Unexpected error updating status: \(error.localizedDescription)")
             // await self.fetchMyAssignmentsForWorkout() // <<< CORRECTED
         }
+        return success
     }
 
     // --- Log Performance for an Assignment ---
@@ -265,6 +275,10 @@ class ClientAssignmentListViewModel: ObservableObject {
             self.errorMessage = "Video upload failed: \(error.localizedDescription)" // Set general error
             print("ClientAssignListVM: Video Upload Process Error: \(error.localizedDescription)")
             // await self.fetchMyAssignmentsForWorkout() // <<< CORRECTED if needed
+        }
+        
+        if self.errorMessage == nil { // Double check no error was set during the process
+            toastManager.showToast(style: .success, message: "Video uploaded and submitted!")
         }
         
         // Clean up temporary file

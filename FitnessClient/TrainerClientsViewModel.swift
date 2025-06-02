@@ -7,6 +7,7 @@ class TrainerClientsViewModel: ObservableObject {
     @Published var clients: [UserResponse] = []
     @Published var isLoading = false
     @Published var errorMessage: String? = nil
+    @Published var greeting: String = ""
 
     private let apiService: APIService
     // No need for AuthService directly if APIService handles token correctly

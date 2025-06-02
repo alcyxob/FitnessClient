@@ -31,7 +31,7 @@ class ClientDetailViewModel: ObservableObject {
         print("ClientDetailVM: Initialized with full client object: \(client.email)")
     }
 
-    // --- NEW Initializer for when only clientID is available ---
+    // --- Initializer for when only clientID is available ---
     init(clientId: String, apiService: APIService, authService: AuthService) {
         self.initialClientID = clientId
         self.client = nil // Will be fetched
@@ -96,9 +96,11 @@ class ClientDetailViewModel: ObservableObject {
             return
         }
         
+        guard let currentClient = self.client else { return }
+        
         print("ClientDetailVM: Fetching training plans for client \(currentClient.id)...")
         isLoadingPlans = true
-        errorMessage = nil
+        //errorMessage = nil
         let endpoint = "/trainer/clients/\(currentClient.id)/plans"
 
         do {
@@ -108,6 +110,7 @@ class ClientDetailViewModel: ObservableObject {
             if fetchedPlans.isEmpty {
                  // self.errorMessage = "No training plans found for this client." // Optional message
             }
+            self.errorMessage = nil // Clear error if plan fetch was successful
         } catch let error as APINetworkError {
             self.errorMessage = error.localizedDescription
             print("ClientDetailVM: Error fetching plans (APINetworkError): \(error.localizedDescription)")

@@ -4,9 +4,13 @@ import SwiftUI
 struct ProvideFeedbackView: View {
     @StateObject var viewModel: ProvideFeedbackViewModel
     @Environment(\.dismiss) var dismiss
-
-    init(assignment: Assignment, apiService: APIService) {
-        _viewModel = StateObject(wrappedValue: ProvideFeedbackViewModel(assignment: assignment, apiService: apiService))
+    
+    init(assignment: Assignment, apiService: APIService, toastManager: ToastManager) {
+        _viewModel = StateObject(wrappedValue: ProvideFeedbackViewModel(
+            assignment: assignment,
+            apiService: apiService,
+            toastManager: toastManager // Pass to VM
+        ))
     }
 
     var body: some View {
@@ -83,6 +87,7 @@ struct ProvideFeedbackView: View {
 struct ProvideFeedbackView_Previews: PreviewProvider {
     static func createPreviewInstance() -> some View {
         let mockAuth = AuthService()
+        let mockToast = ToastManager();
         mockAuth.authToken = "fake_token"
         mockAuth.loggedInUser = UserResponse(id: "trainer1", name: "Preview Trainer", email: "t@p.com", role: "trainer", createdAt: Date(), clientIds: nil, trainerId: nil)
         let mockAPI = APIService(authService: mockAuth)
@@ -95,9 +100,10 @@ struct ProvideFeedbackView_Previews: PreviewProvider {
             updatedAt: Date(), exercise: mockExercise
         )
 
-        return ProvideFeedbackView(assignment: previewAssignment, apiService: mockAPI)
+        return ProvideFeedbackView(assignment: previewAssignment, apiService: mockAPI, toastManager: mockToast)
             .environmentObject(mockAPI) // In case sub-views need it, though unlikely
             .environmentObject(mockAuth)
+            .environmentObject(mockToast);
     }
     
     static var previews: some View {
