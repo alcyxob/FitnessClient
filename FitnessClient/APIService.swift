@@ -200,6 +200,13 @@ class APIService: ObservableObject {
             throw APINetworkError.unauthorized
         case 403:
             throw APINetworkError.forbidden
+        case 409: // <<< NEW CASE
+            do {
+                let errorResponse = try jsonDecoder.decode(APIErrorResponse.self, from: data)
+                throw APINetworkError.serverError(statusCode: 409, message: errorResponse.error) // Pass specific message
+            } catch {
+                throw APINetworkError.serverError(statusCode: 409, message: "A conflict occurred.") // Fallback
+            }
         default:
             // Try to decode an APIErrorResponse from the body for other errors
             do {
