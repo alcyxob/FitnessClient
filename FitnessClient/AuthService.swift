@@ -2,6 +2,21 @@
 import Foundation
 import KeychainAccess // Import the library
 
+// DTO for pre-check request
+struct ApplePreCheckRequest: Codable {
+    let identityToken: String
+}
+
+// DTO for pre-check response
+struct ApplePreCheckResponse: Codable {
+    let userExists: Bool // Match backend JSON key, e.g., "user_exists"
+    
+    // Add CodingKeys if backend JSON differs
+    enum CodingKeys: String, CodingKey {
+        case userExists = "user_exists"
+    }
+}
+
 @MainActor
 class AuthService: ObservableObject {
 
@@ -144,6 +159,33 @@ class AuthService: ObservableObject {
             print("Error saving to Keychain: \(error.localizedDescription)")
         }
     }
+    
+    // --- NEW: Pre-check method ---
+    func precheckAppleUser(identityToken: String) async throws -> Bool {
+        print("AuthService: Pre-checking Apple user with backend...")
+        isLoading = true // Use general loading state
+        defer { isLoading = false }
+
+        let endpoint = "/auth/apple/precheck"
+        let payload = ApplePreCheckRequest(identityToken: identityToken)
+        
+        // This can use your generic APIService if it's set up for non-authenticated POSTs
+        // or a direct URLSession call. Let's assume a direct call for clarity.
+        var request = URLRequest(url: baseURL.appendingPathComponent(endpoint))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(payload)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            // Handle 401, 500 etc.
+            throw APIErrorResponse(error: "Pre-check failed with status \( (response as? HTTPURLResponse)?.statusCode ?? 0 )")
+        }
+
+        let preCheckResponse = try JSONDecoder().decode(ApplePreCheckResponse.self, from: data)
+        print("AuthService: Pre-check response received. User exists: \(preCheckResponse.userExists)")
+        return preCheckResponse.userExists
+    }
 
     private func loadTokenAndUserFromKeychain() {
         do {
@@ -285,6 +327,77 @@ class AuthService: ObservableObject {
          }
          isLoading = false
      }
+    
+    // --- NEW: Method to call your backend after Apple Sign In ---
+    func handleAppleSignIn(
+        identityToken: String,
+        firstName: String?,
+        lastName: String?,
+        selectedRole: domain.Role // Role is now mandatory if it's a new user
+    ) async {
+        print("AuthService: handleAppleSignIn called. Role: \(selectedRole.rawValue). Preparing to call backend /auth/apple/callback")
+        isLoading = true
+        errorMessage = nil
+
+        let payload = SignInWithAppleRequest(
+            identityToken: identityToken,
+            firstName: firstName, // Pass optionals, init handles nil
+            lastName: lastName,
+            role: selectedRole // Pass the domain.Role enum
+        )
+
+        let endpoint = "/auth/apple/callback"
+
+        do {
+            var request = URLRequest(url: baseURL.appendingPathComponent(endpoint))
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONEncoder().encode(payload)
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw URLError(.cannotParseResponse)
+            }
+
+            print("AuthService: Backend Apple callback response status: \(httpResponse.statusCode)")
+            let decoder = JSONDecoder()
+            let iso8601WithMillisecondsFormatter: DateFormatter = {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
+                // ... (same setup as decoder's formatter)
+                formatter.calendar = Calendar(identifier: .iso8601)
+                formatter.timeZone = TimeZone(secondsFromGMT: 0)
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                return formatter
+            }()
+            decoder.dateDecodingStrategy = .formatted(iso8601WithMillisecondsFormatter)
+
+            if (200..<300).contains(httpResponse.statusCode) {
+                let socialLoginResponse = try decoder.decode(SocialLoginResponse.self, from: data) // <<< DECODE NEW TYPE
+                
+                saveTokenAndUserToKeychain(token: socialLoginResponse.token, user: socialLoginResponse.user)
+                self.authToken = socialLoginResponse.token
+                self.loggedInUser = socialLoginResponse.user
+                self.errorMessage = nil
+                print("AuthService: Successfully signed in/registered via Apple. New User: \(socialLoginResponse.isNewUser)") // <<< USE IT
+            } else {
+                // Try to decode your backend's APIErrorResponse
+                do {
+                    let errorResponse = try decoder.decode(APIErrorResponse.self, from: data)
+                    throw APIErrorResponse(error: "Backend Apple Sign In: \(errorResponse.error)")
+                } catch { // Fallback if error response isn't your standard APIErrorResponse
+                    throw APIErrorResponse(error: "Backend Apple Sign In failed with status \(httpResponse.statusCode). Body: \(String(data: data, encoding: .utf8) ?? "No error body")")
+                }
+            }
+        } catch let apiError as APIErrorResponse {
+            self.errorMessage = apiError.error
+            await clearSession() // Clear any partial session info
+        } catch {
+            self.errorMessage = "An error occurred during Apple Sign-In: \(error.localizedDescription)"
+            await clearSession()
+        }
+        isLoading = false
+    }
 }
 
 // --- DTO for sending data to your backend's /auth/apple/callback ---

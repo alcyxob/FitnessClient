@@ -253,6 +253,38 @@ struct ClientReviewStatusItem: Codable, Identifiable {
     // }
 }
 
+// --- DTO for sending Apple Sign-In data to YOUR backend ---
+// This MUST match the fields expected by your Go backend's
+// api.SignInWithAppleRequest struct.
+struct SignInWithAppleRequest: Codable {
+    let identityToken: String
+    let firstName: String // Send empty string if nil
+    let lastName: String  // Send empty string if nil
+    let role: String      // Send role as string (e.g., "client", "trainer")
+
+    // Ensure CodingKeys match your Go backend's JSON tags if they differ
+    enum CodingKeys: String, CodingKey {
+        case identityToken
+        case firstName
+        case lastName
+        case role
+    }
+
+    // Convenience initializer to handle optional name parts
+    init(identityToken: String, firstName: String?, lastName: String?, role: domain.Role) {
+        self.identityToken = identityToken
+        self.firstName = firstName ?? ""
+        self.lastName = lastName ?? ""
+        self.role = role.rawValue // Convert domain.Role enum to its String rawValue
+    }
+}
+
+struct SocialLoginResponse: Codable { // Matches Go's SocialLoginResponse
+    let token: String
+    let user: UserResponse
+    let isNewUser: Bool
+}
+
 enum domain {
     enum Role: String, Codable, CaseIterable, Identifiable {
         case trainer = "trainer"

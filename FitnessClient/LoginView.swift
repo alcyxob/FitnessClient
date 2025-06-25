@@ -1,216 +1,231 @@
-// LoginView.swift
 import SwiftUI
 import AuthenticationServices
 
 struct LoginView: View {
-    // Use @StateObject to create and manage the lifecycle of AuthService
-    @EnvironmentObject var authService: AuthService
+    @EnvironmentObject var authService: AuthService // For backend calls & main auth state
+    @StateObject private var appleSignInManager = AppleSignInManager() // Handles Apple's native UI
 
-    // State variables to hold user input
     @State private var email = ""
     @State private var password = ""
     
-    @State private var showingRoleSelection = false
-    @State private var appleAuthResult: ASAuthorizationAppleIDCredential? = nil // Store Apple's credential temporarily
-    @State private var appleAuthFullName: PersonNameComponents? = nil // Store full name if provided
+    // State for Role Selection Sheet
+    @State private var showingRoleSelectionSheet = false
+    @State private var appleSignInDataForRoleSelection: AppleSignInResult? = nil
+
 
     var body: some View {
-        NavigationView { // Often useful for titles, navigation later
+        NavigationView {
             VStack(spacing: 20) {
                 Spacer()
-
-                Text("Fitness App Login")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
+                Text("Fitness App Login").font(.largeTitle).fontWeight(.bold)
 
                 TextField("Email", text: $email)
-                    .keyboardType(.emailAddress)
-                    .textContentType(.emailAddress) // Helps with autofill
-                    .autocapitalization(.none)
-                    .padding()
-                    .background(Color(.secondarySystemBackground)) // Subtle background
-                    .cornerRadius(8)
+                    .keyboardType(.emailAddress).textContentType(.emailAddress).autocapitalization(.none)
+                    .padding().background(Color(.secondarySystemBackground)).cornerRadius(8)
 
                 SecureField("Password", text: $password)
-                    .textContentType(.password) // Helps with autofill
-                    .padding()
-                    .background(Color(.secondarySystemBackground))
-                    .cornerRadius(8)
+                    .textContentType(.password)
+                    .padding().background(Color(.secondarySystemBackground)).cornerRadius(8)
 
                 // --- Login Button & Loading Indicator ---
-                if authService.isLoading && appleAuthResult == nil {
-                    ProgressView() // Show loading spinner
+                if authService.isLoading {
+                    ProgressView("Processing...")
                         .padding(.top)
-                } else if appleAuthResult == nil { // Only show email/pass login button if not in Apple Sign-In flow
-                    Button("Login") {
+                } else {
+                    Button("Login with Email") {
                         Task { await authService.login(email: email, password: password) }
                     }
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(8)
-                    .padding(.top)
-                    // Disable button if fields are empty or loading
+                    .padding().frame(maxWidth: .infinity).background(Color.blue).foregroundColor(.white).cornerRadius(8).padding(.top)
                     .disabled(email.isEmpty || password.isEmpty || authService.isLoading)
                 }
                 
-                HStack {
-                    VStack { Divider() }
-                    Text("OR").foregroundColor(.gray)
-                    VStack { Divider() }
-                }
-                .padding(.vertical)
+                DividerText()
 
-                // --- SIGN IN WITH APPLE BUTTON ---
-                SignInWithAppleButton(
-                    .signIn, // Or .signUp, or .continue
-                    onRequest: configureAppleSignInRequest,
-                    onCompletion: handleAppleSignInCompletion
-                )
-                .signInWithAppleButtonStyle(.black) // Or .white, .whiteOutline
-                .frame(height: 50)
-                .cornerRadius(8)
-                // --- END SIGN IN WITH APPLE BUTTON ---
+                // --- Sign in with Apple Button ---
+                if authService.isLoading {
+                    ProgressView("Processing Apple Sign-In...").padding(.top)
+                } else {
+                    Button {
+                        Task {
+                            authService.isLoading = true
+                            authService.errorMessage = nil
+                            appleSignInManager.appleSignInError = nil
+                            do {
+                                // 1. Authenticate with Apple locally
+                                let appleResult = try await appleSignInManager.startSignInWithAppleFlow()
+                                print("LoginView: Native Apple Sign In successful.")
+                                
+                                // 2. Perform backend pre-check
+                                let userExists = try await authService.precheckAppleUser(identityToken: appleResult.identityToken)
+                                
+                                // 3. Decide flow based on pre-check result
+                                if userExists {
+                                    // User exists, log them in directly without asking for role.
+                                    // Backend will find them by AppleUserID or Email and use their existing role.
+                                    print("LoginView: Pre-check shows user exists. Logging in directly.")
+                                    await authService.handleAppleSignIn(
+                                        identityToken: appleResult.identityToken,
+                                        firstName: appleResult.firstName,
+                                        lastName: appleResult.lastName,
+                                        selectedRole: .client // Role doesn't matter here, but API expects it. Backend will ignore for existing user.
+                                    )
+                                } else {
+                                    // User is new. We MUST ask for their role.
+                                    print("LoginView: Pre-check shows new user. Showing role selection sheet.")
+                                    // Store data needed by RoleSelectionView and present the sheet
+                                    self.appleSignInDataForRoleSelection = appleResult
+                                    self.showingRoleSelectionSheet = true
+                                    // The loading state should be turned off here because we are waiting for user input.
+                                    // RoleSelectionView will set it back on when it calls the backend.
+                                    authService.isLoading = false
+                                }
+
+                            } catch ASAuthorizationError.canceled {
+                                print("LoginView: User canceled Apple Sign In.")
+                                authService.errorMessage = nil
+                                authService.isLoading = false // Reset loading state
+                            } catch {
+                                print("LoginView: Apple Sign In or Pre-check failed. Error: \(error.localizedDescription)")
+                                authService.errorMessage = "Sign In failed: \(error.localizedDescription)"
+                                authService.isLoading = false // Reset loading state
+                            }
+                        }
+                    } label: {
+                        // --- CORRECTED APPLE BUTTON APPEARANCE ---
+                        HStack(spacing: 8) {
+                            Image(systemName: "apple.logo")
+                                .font(.title3.weight(.medium))
+                            Text("Sign in with Apple")
+                                .fontWeight(.medium)
+                                .font(.body)
+                        }
+                        .padding(.horizontal)
+                        .frame(height: 50)
+                        .frame(maxWidth: .infinity)
+                        .background(Color.black)
+                        .foregroundColor(Color.white)
+                        .cornerRadius(8)
+                        // --- END CORRECTION ---
+                    }
+                    .padding(.horizontal)
+                }
+                // --- END Sign in with Apple Button ---
                 
-                // --- General Loading Indicator (for Apple Sign-In backend call) ---
-                if authService.isLoading && appleAuthResult != nil {
-                    ProgressView("Finalizing Sign-In...")
+                if authService.isLoading && appleSignInDataForRoleSelection != nil {
+                    ProgressView("Finalizing Sign-In with server...")
                         .padding(.top)
                 }
-
-
-                // --- Error Message Display ---
+                
+                // Display general error messages from AuthService
                 if let errorMessage = authService.errorMessage {
-                    Text(errorMessage)
-                        .foregroundColor(.red)
-                        .padding(.top)
-                        .multilineTextAlignment(.center)
+                    Text(errorMessage).foregroundColor(.red).padding(.top).multilineTextAlignment(.center)
+                }
+                // Display specific errors from AppleSignInManager if any (e.g., credential fetch error)
+                if let appleError = appleSignInManager.appleSignInError {
+                     Text("Apple Error: \(appleError.localizedDescription)")
+                         .foregroundColor(.red).padding(.top).multilineTextAlignment(.center)
                 }
 
-                Spacer()
-                Spacer() // Pushes content towards the center/top
-
-            } // End VStack
-            .padding() // Add padding around the VStack content
-            .navigationTitle("Welcome") // Set a title if using NavigationView
-            .navigationBarHidden(true) // Hide the default bar if needed
-            // --- Sheet for Role Selection (for NEW Apple Sign-In users) ---
-            .sheet(isPresented: $showingRoleSelection, onDismiss: {
-                // If sheet is dismissed without selecting a role, clear appleAuthResult
-                // to allow trying Apple Sign-In again or email/pass login.
-                if !authService.isLoading { // Don't clear if backend call is in progress
-                    appleAuthResult = nil
-                    appleAuthFullName = nil
+                Spacer(minLength: 50) // More space at bottom
+            }
+            .padding()
+            .navigationBarHidden(true)
+            // --- Sheet for Role Selection ---
+            .sheet(isPresented: $showingRoleSelectionSheet, onDismiss: {
+                // This is called when the RoleSelectionView is dismissed.
+                // If login was successful (authToken is set), RootView will handle navigation.
+                // If user cancelled role selection, or it failed, clear temp Apple data.
+                if authService.authToken == nil { // If backend call from RoleSelectionView didn't result in login
+                    print("LoginView: RoleSelectionSheet dismissed, login not completed. Clearing Apple data.")
+                    self.appleSignInDataForRoleSelection = nil
                 }
             }) {
-                // Pass the necessary data to RoleSelectionView
-                RoleSelectionView(
-                    appleAuthCredential: appleAuthResult, // Pass the credential
-                    appleAuthFullName: appleAuthFullName,
-                    authService: authService // To call the final backend registration
-                )
+                // Ensure we have the data before presenting
+                if let appleData = appleSignInDataForRoleSelection {
+                    RoleSelectionView(
+                        //appleAuthCredential: nil, // RoleSelectionView now only needs the token & name, not full credential
+                        appleAuthFullName: PersonNameComponents(givenName: appleData.firstName, familyName: appleData.lastName),
+                        appleIdentityTokenForBackend: appleData.identityToken, // <<< Pass token
+                        appleUserIDFromApple: appleData.appleUserID // Pass Apple's user ID
+                        // authService is passed via environment
+                    )
+                    .environmentObject(authService) // Ensure RoleSelectionView can access it
+                } else {
+                    // Fallback, should not happen if showingRoleSelectionSheet is true
+                    Text("Error: Missing Apple authentication data for role selection.")
+                }
             }
-
-            // --- Post-Login Check (Example) ---
-            // In a real app, you'd navigate away or change the view
+            // RootView will handle navigation when authService.authToken changes
             .onChange(of: authService.authToken) { newToken in
                 if newToken != nil {
-                    print("LoginView: Auth Token set via authService. App should navigate via RootView.")
-                    // RootView handles the navigation based on authToken.
-                    // Clear local states if needed, though RootView switch should suffice.
+                    print("LoginView: authToken changed. Clearing local login states.")
                     self.email = ""
                     self.password = ""
-                    self.appleAuthResult = nil
-                    self.appleAuthFullName = nil
+                    self.appleSignInDataForRoleSelection = nil
+                    // showingRoleSelectionSheet should be false if login succeeded
+                    if showingRoleSelectionSheet { showingRoleSelectionSheet = false }
                 }
             }
-
         } // End NavigationView
     }
-    
-    // --- Apple Sign-In Request Configuration ---
-    func configureAppleSignInRequest(_ request: ASAuthorizationAppleIDRequest) {
-        print("Configuring Apple Sign-In Request...")
-        authService.errorMessage = nil // Clear previous errors
-        // appleAuthResult = nil // Clear previous result
-        request.requestedScopes = [.fullName, .email]
-        // Optional: If you have state for a nonce (for replay protection, more advanced)
-        // request.nonce = ...
-    }
-    
-    // --- Apple Sign-In Completion Handler ---
-    func handleAppleSignInCompletion(_ result: Result<ASAuthorization, Error>) {
-        switch result {
-        case .success(let authorization):
-            print("Apple Sign-In Success!")
-            if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
-                self.appleAuthResult = appleIDCredential // Store the credential
-                self.appleAuthFullName = appleIDCredential.fullName // Store name parts if given
-
-                // --- Log Apple Credential Details (FOR DEBUGGING ONLY) ---
-                print("   Apple User ID (for your team): \(appleIDCredential.user)")
-                if let email = appleIDCredential.email { print("   Email (first time only): \(email)") }
-                if let givenName = appleIDCredential.fullName?.givenName { print("   Given Name (first time only): \(givenName)") }
-                if let familyName = appleIDCredential.fullName?.familyName { print("   Family Name (first time only): \(familyName)") }
-                if let identityTokenData = appleIDCredential.identityToken,
-                   let identityTokenString = String(data: identityTokenData, encoding: .utf8) {
-                    print("   Identity Token Length: \(identityTokenString.count)")
-                    // DO NOT print the full token in production logs
-                }
-                // --- END DEBUG LOGS ---
-
-
-                // **NEXT STEP:** Call your backend.
-                // Before calling backend: If it's a *new* user (which your backend will determine),
-                // you might need to ask for their role (Trainer/Client) first.
-                // For now, let's assume we'll ask for role *if* backend says it's a new user
-                // OR we can try to send role directly if we can determine it here.
-                //
-                // The backend's SignInWithApple now takes a `roleIfNewUser`.
-                // How do we get this role? We need to show RoleSelectionView.
-                
-                // Let's set a flag to show the role selection sheet.
-                // The actual call to your backend will happen *from* the RoleSelectionView
-                // after a role is chosen, or directly if we can assume a role or backend handles it.
-                //
-                // For now, let's assume if email from Apple is nil or if user ID is new (can't check that here easily),
-                // we show role selection. A simpler way is to *always* call the backend and if it says
-                // "role required for new user", then show the role selection.
-                //
-                // Let's make RoleSelectionView responsible for calling the backend.
-                // So, here we just set the state to show it.
-                
-                self.showingRoleSelection = true
-
-
-            } else if let passwordCredential = authorization.credential as? ASPasswordCredential {
-                // User signed in using a saved password from iCloud Keychain.
-                // You can get the username and password here.
-                // Not typically part of "Sign in with Apple" button flow directly, but part of ASAuthorization.
-                print("Apple Sign-In: User selected a password credential: \(passwordCredential.user)")
-                // You would use these credentials with your standard email/password login.
-                self.email = passwordCredential.user
-                self.password = passwordCredential.password
-                Task { await authService.login(email: self.email, password: self.password) }
-            }
-
-        case .failure(let error):
-            print("Apple Sign-In Failed: \(error.localizedDescription)")
-            if (error as? ASAuthorizationError)?.code == .canceled {
-                authService.errorMessage = "Sign in with Apple was canceled."
-            } else {
-                authService.errorMessage = "Apple Sign-In Error: \(error.localizedDescription)"
-            }
-            self.appleAuthResult = nil // Clear on failure
-            self.appleAuthFullName = nil
-        }
-    }
 }
+
 
 struct LoginView_Previews: PreviewProvider {
     static var previews: some View {
         LoginView()
             .environmentObject(AuthService())
+    }
+}
+
+// --- MODIFIED RoleSelectionView to take token directly ---
+struct RoleSelectionView: View {
+    @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var authService: AuthService
+
+    // Data passed from LoginView
+    let appleAuthFullName: PersonNameComponents?
+    let appleIdentityTokenForBackend: String // <<< RECEIVE TOKEN
+    let appleUserIDFromApple: String // For reference or if needed
+
+    @State private var selectedRole: domain.Role = .client
+    @State private var isProcessing = false
+    
+    // This is the init that LoginView should call
+    init(appleAuthFullName: PersonNameComponents?,
+         appleIdentityTokenForBackend: String,
+         appleUserIDFromApple: String) {
+        self.appleAuthFullName = appleAuthFullName
+        self.appleIdentityTokenForBackend = appleIdentityTokenForBackend
+        self.appleUserIDFromApple = appleUserIDFromApple
+        _selectedRole = State(initialValue: .client) // Default role
+        print("RoleSelectionView: Initialized. Token (first 10): \(appleIdentityTokenForBackend.prefix(10))... Apple User ID: \(appleUserIDFromApple)")
+    }
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 30) { /* ... UI as before ... */ }
+            .padding()
+            .navigationTitle("Select Your Role")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { /* ... Cancel button ... */ }
+        }
+    }
+
+    private func finalizeRegistration() async {
+        isProcessing = true
+        authService.errorMessage = nil
+
+        await authService.handleAppleSignIn(
+            identityToken: appleIdentityTokenForBackend, // Use the passed token
+            firstName: appleAuthFullName?.givenName,
+            lastName: appleAuthFullName?.familyName,
+            selectedRole: selectedRole
+        )
+        
+        isProcessing = false
+        if authService.authToken != nil {
+            dismiss()
+        }
     }
 }

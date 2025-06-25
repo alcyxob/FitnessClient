@@ -4,6 +4,7 @@ import SwiftUI
 struct ClientDashboardView: View {
     @StateObject var viewModel: ClientDashboardViewModel
     @EnvironmentObject var apiService: APIService
+    @EnvironmentObject var toastManager: ToastManager
     // authService is accessed via viewModel
 
     init(apiService: APIService, authService: AuthService) {
@@ -74,7 +75,8 @@ struct ClientDashboardView: View {
                                 NavigationLink {
                                     ClientAssignmentListView(
                                         workout: workout,
-                                        apiService: apiService
+                                        apiService: apiService,
+                                        toastManager: toastManager
                                     )
                                 } label: {
                                     WorkoutRowView(workout: workout, daysOfWeek: viewModel.daysOfWeek)
@@ -159,7 +161,7 @@ struct ClientDashboardView_Previews: PreviewProvider {
         // To effectively preview different states, you'd need a MockAPIService
         // that can be configured to return specific data or errors for the
         // "/client/workouts/today" endpoint.
-         let mockAPIService = APIService(authService: mockAuthService)
+        let mockAPIService = APIService(authService: mockAuthService)
 
         // The view creates its own ViewModel.
         // For previewing specific states of the ViewModel (isLoading, error, data),
