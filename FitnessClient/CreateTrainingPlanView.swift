@@ -111,7 +111,7 @@ struct CreateTrainingPlanView_Previews: PreviewProvider {
         let mockAuth = AuthService()
         let mockAPI = APIService(authService: mockAuth)
         let mockToast = ToastManager()
-        let previewClient = UserResponse(id: "clientPreview123", name: "Alice Preview", email: "alice@preview.com", role: "client", createdAt: Date(), clientIds: nil, trainerId: "trainerPreview456")
+        let previewClient = UserResponse(id: "clientPreview123", name: "Alice Preview", email: "alice@preview.com", roles: ["client"], createdAt: Date(), clientIds: nil, trainerId: "trainerPreview456")
 
         CreateTrainingPlanView(client: previewClient, apiService: mockAPI, toastManager: mockToast)
             .environmentObject(mockToast)

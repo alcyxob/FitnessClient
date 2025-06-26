@@ -113,7 +113,7 @@ struct TrainerDashboardView_Previews: PreviewProvider {
             id: "t_dash_prev",
             name: "Dr. Train",
             email: "trainer@example.com",
-            role: "trainer",
+            roles: ["trainer"],
             createdAt: Date(),
             clientIds: nil, // Ensure all UserResponse fields are provided
             trainerId: nil  // Ensure all UserResponse fields are provided

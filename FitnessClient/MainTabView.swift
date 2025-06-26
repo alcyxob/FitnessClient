@@ -4,120 +4,146 @@ import SwiftUI
 struct MainTabView: View {
     @EnvironmentObject var authService: AuthService
     @EnvironmentObject var apiService: APIService
+    @EnvironmentObject var appModeManager: AppModeManager
 
     var body: some View {
-        TabView {
-            // --- Tab 1: Home/Dashboard ---
-            if authService.loggedInUser?.role == "client" {
-                ClientDashboardView(apiService: apiService, authService: authService) // Pass services
-                    .tabItem { Label("Today", systemImage: "figure.mixed.cardio") } // "Today" or "Home"
-                    .tag(0)
-            } else if authService.loggedInUser?.role == "trainer" {
-                // Trainer's Home/Dashboard (Placeholder for now)
-                TrainerDashboardView(apiService: apiService, authService: authService) // Pass services
-                    .tabItem { Label("Dashboard", systemImage: "list.clipboard.fill") } // Icon for dashboard
-                    .tag(0)
+        // Use a Group to avoid re-initializing TabView when mode changes, which can reset tab selection
+        Group {
+            if let user = authService.loggedInUser {
+                if user.hasRole(.trainer) && appModeManager.currentMode == .trainer {
+                    // --- TRAINER VIEW ---
+                    TabView {
+                        TrainerDashboardView(apiService: apiService, authService: authService)
+                            .tabItem { Label("Dashboard", systemImage: "list.clipboard.fill") }
+                            .tag(0)
+
+                        TrainerExerciseListView(viewModel: TrainerExerciseListViewModel(apiService: apiService, authService: authService))
+                            .tabItem { Label("My Exercises", systemImage: "figure.run.circle.fill") }
+                            .tag(1)
+
+                        TrainerClientsView(viewModel: TrainerClientsViewModel(apiService: apiService))
+                            .tabItem { Label("My Clients", systemImage: "person.2.fill") }
+                            .tag(2)
+                        
+                        SettingsView()
+                            .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+                            .tag(3)
+                    }
+                } else {
+                    // --- CLIENT VIEW ---
+                    // This is shown if user is only a client,
+                    // OR if they have both roles but currentMode is .client
+                    TabView {
+                        ClientDashboardView(apiService: apiService, authService: authService)
+                            .tabItem { Label("Today", systemImage: "figure.mixed.cardio") }
+                            .tag(0)
+                        
+                        ClientPlansView(apiService: apiService)
+                            .tabItem { Label("My Plans", systemImage: "list.star") }
+                            .tag(1)
+                        
+                        Text("Client Progress (Placeholder)")
+                            .tabItem { Label("Progress", systemImage: "chart.bar.xaxis") }
+                            .tag(2)
+                        
+                        SettingsView()
+                            .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+                            .tag(3)
+                    }
+                }
             } else {
-                // Fallback if role is unknown or user is nil (shouldn't happen if RootView works)
-                Text("Welcome")
-                    .tabItem { Label("Home", systemImage: "house.fill") }
-                    .tag(0)
+                // Fallback if user is somehow nil (RootView should prevent this)
+                ProgressView()
             }
-            // --- END UPDATED HOME TAB ---
-
-            // --- Tab 2: Role-Specific Primary View ---
-            if authService.loggedInUser?.role == "trainer" {
-                TrainerExerciseListView(viewModel: TrainerExerciseListViewModel(apiService: apiService, authService: authService))
-                    .tabItem { Label("My Exercises", systemImage: "figure.run.circle.fill") }
-                    .tag(1)
-            } else if authService.loggedInUser?.role == "client" {
-                // ---> Show ClientPlansView for CLIENTS <---
-                ClientPlansView(apiService: apiService) // Pass apiService
-                    .tabItem { Label("My Plans", systemImage: "list.star") } // Icon for plans
-                    .tag(1) // Can reuse tag if it's an either/or scenario
-            }
-
-            // --- Tab 3: Clients (Trainers) OR Other Client Tab ---
-            if authService.loggedInUser?.role == "trainer" {
-                 TrainerClientsView(viewModel: TrainerClientsViewModel(apiService: apiService))
-                 .tabItem { Label("My Clients", systemImage: "person.2.fill") }
-                 .tag(2)
-             } else if authService.loggedInUser?.role == "client" {
-                 // Placeholder for another client tab, e.g., "Progress" or "Profile"
-                 Text("Client Progress (Placeholder)")
-                     .tabItem { Label("Progress", systemImage: "chart.bar.xaxis") }
-                     .tag(2)
-             }
-
-             // No specific 4th tab for client yet, or can be combined
-
-            SettingsView() // <<< REPLACE Placeholder Text HERE
-                .tabItem { Label("Settings", systemImage: "gearshape.fill") }
-                .tag(3) 
-        }
+        } // End Group
+        // Optional: Animate the switch between TabViews
+        .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)).combined(with: .opacity))
+        .animation(.easeInOut, value: appModeManager.currentMode)
     }
 }
 
 // Preview Provider for MainTabView
 struct MainTabView_Previews: PreviewProvider {
 
-    // Helper Wrapper View for MainTabView Previews (remains the same)
+    // Helper Wrapper View for setting up each preview's environment
     struct PreviewWrapper: View {
-        let authService: AuthService
-        let apiService: APIService
+        // We create the services outside and pass them in to configure them
+        // for different states (e.g., trainer vs. client)
+        @StateObject var authService: AuthService
+        @StateObject var apiService: APIService
+        @StateObject var appModeManager: AppModeManager
+        @StateObject var toastManager: ToastManager
+
+        init(authService: AuthService, appModeManager: AppModeManager) {
+            let auth = authService
+            _authService = StateObject(wrappedValue: auth)
+            _apiService = StateObject(wrappedValue: APIService(authService: auth)) // Depends on auth
+            _appModeManager = StateObject(wrappedValue: appModeManager)
+            _toastManager = StateObject(wrappedValue: ToastManager())
+        }
 
         var body: some View {
             MainTabView()
                 .environmentObject(authService)
                 .environmentObject(apiService)
+                .environmentObject(appModeManager)
+                .environmentObject(toastManager)
+                // Add the toastView modifier here so previews can see toasts
+                .toastView(toast: .constant(nil)) // Provide a dummy binding for preview
         }
-    }
-
-    // Helper function to create a configured "Trainer" preview instance
-    static func trainerPreview() -> some View {
-        let mockAuthTrainer = AuthService()
-        mockAuthTrainer.authToken = "trainer_token_preview"
-        mockAuthTrainer.loggedInUser = UserResponse(
-            id: "t_prev_main",
-            name: "Trainer Preview Main",
-            email: "t_main@p.com",
-            role: "trainer",
-            createdAt: Date(),
-            clientIds: nil,
-            trainerId: nil
-        )
-        let mockApiTrainer = APIService(authService: mockAuthTrainer)
-        
-        return PreviewWrapper(authService: mockAuthTrainer, apiService: mockApiTrainer)
-    }
-
-    // Helper function to create a configured "Client" preview instance
-    static func clientPreview() -> some View {
-        let mockAuthClient = AuthService()
-        mockAuthClient.authToken = "client_token_preview"
-        mockAuthClient.loggedInUser = UserResponse(
-            id: "c_prev_main",
-            name: "Client Preview Main",
-            email: "c_main@p.com",
-            role: "client",
-            createdAt: Date(),
-            clientIds: nil,
-            trainerId: "t_prev_main"
-        )
-        let mockApiClient = APIService(authService: mockAuthClient)
-
-        return PreviewWrapper(authService: mockAuthClient, apiService: mockApiClient)
     }
 
     static var previews: some View {
-        Group {
-            trainerPreview() // Call the helper function
-                .previewDisplayName("As Trainer")
+        // --- Setup for "As Trainer" Preview ---
+        let trainerAuthService: AuthService = {
+            let auth = AuthService() // Assuming a simplified/mock init is possible for previews
+            auth.authToken = "trainer_token_preview"
+            auth.loggedInUser = UserResponse(
+                id: "t_main_prev",
+                name: "Trainer Preview",
+                email: "trainer@main.com",
+                roles: ["trainer", "client"], // <<< Trainer with both roles
+                createdAt: Date(),
+                clientIds: nil,
+                trainerId: nil
+            )
+            return auth
+        }()
+        
+        let trainerModeManager: AppModeManager = {
+            let mode = AppModeManager()
+            mode.currentMode = .trainer // Start in trainer mode
+            return mode
+        }()
 
-            clientPreview() // Call the helper function
-                .previewDisplayName("As Client")
+
+        // --- Setup for "As Client" Preview ---
+        let clientAuthService: AuthService = {
+            let auth = AuthService()
+            auth.authToken = "client_token_preview"
+            auth.loggedInUser = UserResponse(
+                id: "c_main_prev",
+                name: "Client Preview",
+                email: "client@main.com",
+                roles: ["client"], // <<< Client with only client role
+                createdAt: Date(),
+                clientIds: nil,
+                trainerId: "t_main_prev"
+            )
+            return auth
+        }()
+        
+        let clientModeManager = AppModeManager() // Defaults to .client mode
+
+        // --- Use Group to show multiple previews ---
+        Group {
+            // Preview for a user with both roles, currently in Trainer Mode
+            PreviewWrapper(authService: trainerAuthService, appModeManager: trainerModeManager)
+                .previewDisplayName("As Trainer (Dual Role)")
+
+            // Preview for a user with only the client role
+            PreviewWrapper(authService: clientAuthService, appModeManager: clientModeManager)
+                .previewDisplayName("As Client Only")
         }
-        // No .environmentObject needed on the Group here,
-        // as PreviewWrapper handles it internally for each case.
     }
 }

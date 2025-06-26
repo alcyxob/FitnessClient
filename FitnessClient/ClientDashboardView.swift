@@ -156,7 +156,7 @@ struct ClientDashboardView_Previews: PreviewProvider {
     static func createPreviewWithServiceInit(isLoading: Bool = false, errorMessage: String? = nil, workouts: [Workout]? = nil) -> some View {
          let mockAuthService = AuthService()
          mockAuthService.authToken = "client_token_preview"
-         mockAuthService.loggedInUser = UserResponse(id: "c_dash_prev", name: "Jane Client", email: "jane@example.com", role: "client", createdAt: Date(), clientIds: nil, trainerId: "t_dash_prev")
+         mockAuthService.loggedInUser = UserResponse(id: "c_dash_prev", name: "Jane Client", email: "jane@example.com", roles: ["client"], createdAt: Date(), clientIds: nil, trainerId: "t_dash_prev")
          
         // To effectively preview different states, you'd need a MockAPIService
         // that can be configured to return specific data or errors for the

@@ -70,14 +70,13 @@ struct LoginView: View {
                                         selectedRole: .client // Role doesn't matter here, but API expects it. Backend will ignore for existing user.
                                     )
                                 } else {
-                                    // User is new. We MUST ask for their role.
-                                    print("LoginView: Pre-check shows new user. Showing role selection sheet.")
-                                    // Store data needed by RoleSelectionView and present the sheet
-                                    self.appleSignInDataForRoleSelection = appleResult
-                                    self.showingRoleSelectionSheet = true
-                                    // The loading state should be turned off here because we are waiting for user input.
-                                    // RoleSelectionView will set it back on when it calls the backend.
-                                    authService.isLoading = false
+                                    await authService.handleAppleSignIn(
+                                        identityToken: appleResult.identityToken,
+                                        firstName: appleResult.firstName,
+                                        lastName: appleResult.lastName,
+                                        selectedRole: .client
+                                        // No longer pass a role
+                                    )
                                 }
 
                             } catch ASAuthorizationError.canceled {

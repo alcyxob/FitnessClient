@@ -206,7 +206,7 @@ struct WorkoutListView_Previews: PreviewProvider {
     static var previews: some View {
         let mockAuthService = AuthService()
         mockAuthService.authToken = "fake_token_for_preview"
-        mockAuthService.loggedInUser = UserResponse(id: "trainerPreview123", name: "Preview Trainer", email: "trainer@preview.com", role: "trainer", createdAt: Date(), clientIds: nil, trainerId: nil)
+        mockAuthService.loggedInUser = UserResponse(id: "trainerPreview123", name: "Preview Trainer", email: "trainer@preview.com", roles: ["trainer"], createdAt: Date(), clientIds: nil, trainerId: nil)
 
         let mockAPIService = APIService(authService: mockAuthService)
 

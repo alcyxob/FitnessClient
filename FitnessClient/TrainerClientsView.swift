@@ -172,15 +172,15 @@ struct TrainerClientsView_Previews: PreviewProvider {
         // --- Setup Mock Services ONCE ---
         let mockAuthService = AuthService()
         mockAuthService.authToken = "fake_token_for_preview"
-        mockAuthService.loggedInUser = UserResponse(id: "previewTrainer", name: "Preview Trainer", email: "preview@trainer.com", role: "trainer", createdAt: Date(), clientIds: nil, trainerId: nil)
+        mockAuthService.loggedInUser = UserResponse(id: "previewTrainer", name: "Preview Trainer", email: "preview@trainer.com", roles: ["trainer"], createdAt: Date(), clientIds: nil, trainerId: nil)
         let mockAPIService = APIService(authService: mockAuthService)
 
         // --- Create and configure ONE ViewModel for the single preview ---
         let vmData: TrainerClientsViewModel = {
              let vm = TrainerClientsViewModel(apiService: mockAPIService)
              vm.clients = [
-                UserResponse(id: "client1", name: "Alice Example", email: "alice@example.com", role: "client", createdAt: Date(), clientIds: nil, trainerId: "previewTrainer"),
-                UserResponse(id: "client2", name: "Bob Sample", email: "bob@sample.com", role: "client", createdAt: Date(), clientIds: nil, trainerId: "previewTrainer")
+                UserResponse(id: "client1", name: "Alice Example", email: "alice@example.com", roles: ["client"], createdAt: Date(), clientIds: nil, trainerId: "previewTrainer"),
+                UserResponse(id: "client2", name: "Bob Sample", email: "bob@sample.com", roles: ["client"], createdAt: Date(), clientIds: nil, trainerId: "previewTrainer")
              ]
              return vm
         }()

@@ -182,7 +182,7 @@ struct AddExerciseToWorkoutView_Previews: PreviewProvider {
             id: "trainerPreview123",
             name: "Preview Trainer",
             email: "trainer@preview.com",
-            role: "trainer",
+            roles: ["trainer"],
             createdAt: Date(), // Ensure Date() is accessible
             clientIds: nil,
             trainerId: nil

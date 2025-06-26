@@ -2,21 +2,25 @@
 import Foundation
 
 // Matches the Go API's UserResponse DTO
-struct UserResponse: Codable, Identifiable {
+struct UserResponse: Codable, Identifiable, Hashable, Equatable {
     let id: String // Use String for the hex ObjectID from Go/Mongo
     let name: String
     let email: String
-    let role: String // Keep as String for now, can be enum later
+    let roles: [String]
     let createdAt: Date // Assuming Go API sends RFC3339 or ISO8601 format
     let clientIds: [String]? // Optional array of client ID strings
     let trainerId: String?   // Optional trainer ID string
 
-    // If your Go API uses different JSON keys (e.g., "created_at"), use CodingKeys:
-    // enum CodingKeys: String, CodingKey {
-    //     case id, name, email, role
-    //     case createdAt = "created_at" // Map JSON "created_at" to Swift "createdAt"
-    //     case clientIds, trainerId
-    // }
+    // Helper methods for easy role checking
+    func hasRole(_ role: domain.Role) -> Bool {
+        return roles.contains(role.rawValue)
+    }
+
+    // Add CodingKeys if your backend JSON keys differ from these property names
+//    enum CodingKeys: String, CodingKey {
+//        case id, name, email, roles, createdAt // Use 'roles'
+//        case clientIds, trainerId, appleUserID, googleUserID
+//    }
 }
 
 // Matches the Go API's LoginResponse DTO

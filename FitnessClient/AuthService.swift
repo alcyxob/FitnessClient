@@ -51,6 +51,16 @@ class AuthService: ObservableObject {
             print("AuthService: No active session found in Keychain.")
         }
     }
+    
+    func processSuccessfulLogin(token: String, user: UserResponse) {
+        print("AuthService: Processing successful login/session update for user \(user.email)")
+        // 1. Save to Keychain
+        saveTokenAndUserToKeychain(token: token, user: user)
+        // 2. Update published properties to trigger UI changes
+        self.authToken = token
+        self.loggedInUser = user
+        self.errorMessage = nil
+    }
 
     // --- Login Function ---
     func login(email: String, password: String) async {
@@ -75,11 +85,6 @@ class AuthService: ObservableObject {
             }
             print("Received status code: \(httpResponse.statusCode)")
 
-            // --- TEMPORARY DEBUGGING: Print raw data ---
-            if let jsonString = String(data: data, encoding: .utf8) {
-                 print("RAW JSON RESPONSE:\n\(jsonString)\n--------------------")
-            }
-
             let decoder = JSONDecoder()
             let iso8601WithMillisecondsFormatter: DateFormatter = {
                 let formatter = DateFormatter()
@@ -93,6 +98,7 @@ class AuthService: ObservableObject {
 
             if (200..<300).contains(httpResponse.statusCode) {
                 let loginResponse = try decoder.decode(LoginResponse.self, from: data)
+                processSuccessfulLogin(token: loginResponse.token, user: loginResponse.user)
                 print("Login successful! Token received.")
 
                 // --- SAVE TO KEYCHAIN ---
@@ -136,6 +142,7 @@ class AuthService: ObservableObject {
     // --- Keychain Helper Methods ---
     private func saveTokenAndUserToKeychain(token: String, user: UserResponse) {
         do {
+            print("AuthService: Saving to Keychain. Token length: \(token.count), User roles: \(user.roles)")
             try keychain.set(token, key: keychainAuthTokenKey)
 
             let encoder = JSONEncoder()
@@ -328,6 +335,29 @@ class AuthService: ObservableObject {
          isLoading = false
      }
     
+    func updateStoredUser(user: UserResponse) {
+        // This method updates the user object in Keychain without touching the token.
+        // It's called after an action like activating a trainer role.
+        do {
+            let encoder = JSONEncoder()
+            let iso8601WithMillisecondsFormatter: DateFormatter = {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
+                formatter.calendar = Calendar(identifier: .iso8601)
+                formatter.timeZone = TimeZone(secondsFromGMT: 0)
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                return formatter
+            }()
+            encoder.dateEncodingStrategy = .formatted(iso8601WithMillisecondsFormatter)
+            
+            let userData = try encoder.encode(user)
+            try keychain.set(userData, key: keychainUserKey)
+            print("AuthService: Updated user data in Keychain.")
+        } catch {
+            print("AuthService: Error updating user data in Keychain: \(error.localizedDescription)")
+        }
+    }
+    
     // --- NEW: Method to call your backend after Apple Sign In ---
     func handleAppleSignIn(
         identityToken: String,
@@ -364,7 +394,6 @@ class AuthService: ObservableObject {
             let iso8601WithMillisecondsFormatter: DateFormatter = {
                 let formatter = DateFormatter()
                 formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
-                // ... (same setup as decoder's formatter)
                 formatter.calendar = Calendar(identifier: .iso8601)
                 formatter.timeZone = TimeZone(secondsFromGMT: 0)
                 formatter.locale = Locale(identifier: "en_US_POSIX")

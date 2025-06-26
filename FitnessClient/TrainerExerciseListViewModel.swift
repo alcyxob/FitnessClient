@@ -17,7 +17,7 @@ class TrainerExerciseListViewModel: ObservableObject {
     }
 
     func fetchTrainerExercises() async {
-        guard let trainer = authService.loggedInUser, trainer.role == "trainer" else {
+        guard let trainer = authService.loggedInUser, trainer.hasRole(.trainer) else {
             errorMessage = "User is not a trainer or not logged in."
             print("FetchExercises: Attempted by non-trainer or non-logged-in user.")
             return
@@ -59,7 +59,7 @@ class TrainerExerciseListViewModel: ObservableObject {
     
     // --- Delete Exercise ---
     func deleteExercise(exerciseId: String) async -> Bool { // Return bool for success
-        guard let trainer = authService.loggedInUser, trainer.role == "trainer" else {
+        guard let trainer = authService.loggedInUser, trainer.hasRole(.trainer)else {
             errorMessage = "Authentication error or not a trainer."
             return false
         }

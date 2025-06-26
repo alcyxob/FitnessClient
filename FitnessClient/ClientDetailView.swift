@@ -201,11 +201,11 @@ struct ClientDetailView: View {
 struct ClientDetailView_Previews: PreviewProvider {
     static func createFullClientPreview() -> some View {
         let mockAuth = AuthService();
-        mockAuth.loggedInUser = UserResponse(id: "trainerPrev1", name: "Preview Trainer", email: "trainer@preview.com", role: "trainer", createdAt: Date(), clientIds: nil, trainerId: nil)
+        mockAuth.loggedInUser = UserResponse(id: "trainerPrev1", name: "Preview Trainer", email: "trainer@preview.com", roles: ["trainer"], createdAt: Date(), clientIds: nil, trainerId: nil)
         mockAuth.authToken = "fake_token"
         let mockAPI = APIService(authService: mockAuth);
         
-        let previewClient = UserResponse(id: "clientFullPrev1", name: "Full Client (Alice)", email: "full_alice@c.com", role: "client", createdAt: Date(), clientIds: nil, trainerId: "trainerPrev1")
+        let previewClient = UserResponse(id: "clientFullPrev1", name: "Full Client (Alice)", email: "full_alice@c.com", roles: ["client"], createdAt: Date(), clientIds: nil, trainerId: "trainerPrev1")
         
         // To see plans in preview, the ClientDetailViewModel would need to be pre-populated,
         // or the mockAPIService would need to return mock plans for "/trainer/clients/{id}/plans".
@@ -220,7 +220,7 @@ struct ClientDetailView_Previews: PreviewProvider {
 
     static func createIdOnlyPreview() -> some View {
         let mockAuth = AuthService();
-        mockAuth.loggedInUser = UserResponse(id: "trainerPrev2", name: "Preview Trainer", email: "trainer@preview.com", role: "trainer", createdAt: Date(), clientIds: nil, trainerId: nil)
+        mockAuth.loggedInUser = UserResponse(id: "trainerPrev2", name: "Preview Trainer", email: "trainer@preview.com", roles: ["trainer"], createdAt: Date(), clientIds: nil, trainerId: nil)
         mockAuth.authToken = "fake_token"
         let mockAPI = APIService(authService: mockAuth);
         

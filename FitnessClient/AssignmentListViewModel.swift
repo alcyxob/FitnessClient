@@ -69,10 +69,9 @@ class AssignmentListViewModel: ObservableObject {
     // Method to get the video download URL (Trainer's context)
     func fetchVideoDownloadURL(for assignment: Assignment) async -> URL? {
         // Check 1: Ensure the logged-in user is a trainer from authService
-        guard let currentUser = self.authService.loggedInUser, currentUser.role == "trainer" else {
-            print("AssignListVM: Current user is not a trainer or not logged in. Cannot fetch video URL.")
-            // Set an error message specific to this action, not the general list errorMessage
-            // self.videoFetchError = "Not authorized as trainer." // Example for a specific error property
+        guard let currentUser = self.authService.loggedInUser, currentUser.hasRole(.trainer) else {
+            print("AssignListVM (Trainer): Current user is not a trainer or not logged in.")
+            self.errorMessage = "Not authorized as trainer."
             return nil
         }
 

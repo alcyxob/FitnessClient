@@ -89,7 +89,7 @@ struct ProvideFeedbackView_Previews: PreviewProvider {
         let mockAuth = AuthService()
         let mockToast = ToastManager();
         mockAuth.authToken = "fake_token"
-        mockAuth.loggedInUser = UserResponse(id: "trainer1", name: "Preview Trainer", email: "t@p.com", role: "trainer", createdAt: Date(), clientIds: nil, trainerId: nil)
+        mockAuth.loggedInUser = UserResponse(id: "trainer1", name: "Preview Trainer", email: "t@p.com", roles: ["trainer"], createdAt: Date(), clientIds: nil, trainerId: nil)
         let mockAPI = APIService(authService: mockAuth)
 
         let mockExercise = Exercise(id: "ex1", trainerId: "trainer1", name: "Preview Push Ups", createdAt: Date(), updatedAt: Date())

@@ -89,7 +89,7 @@ struct ClientWorkoutsView_Previews: PreviewProvider {
     static func createPreviewInstance() -> some View {
         let mockAuth = AuthService()
         mockAuth.authToken = "fake_client_token"
-        mockAuth.loggedInUser = UserResponse(id: "clientPrev", name: "Client Preview", email: "c@p.com", role: "client", createdAt: Date(), clientIds: nil, trainerId: "tPrev")
+        mockAuth.loggedInUser = UserResponse(id: "clientPrev", name: "Client Preview", email: "c@p.com", roles: ["client"], createdAt: Date(), clientIds: nil, trainerId: "tPrev")
         let mockAPI = APIService(authService: mockAuth)
         
         let previewPlan = TrainingPlan(

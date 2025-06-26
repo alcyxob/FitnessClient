@@ -372,7 +372,7 @@ struct AssignmentListView_Previews: PreviewProvider {
         let mockAuthService = AuthService()
         mockAuthService.authToken = "fake_trainer_token"
         mockAuthService.loggedInUser = UserResponse(
-            id: "trainerPrev", name: "Trainer Preview", email: "t@p.com", role: "trainer",
+            id: "trainerPrev", name: "Trainer Preview", email: "t@p.com", roles: ["trainer"],
             createdAt: Date(), clientIds: nil, trainerId: nil
         )
         let mockAPIService = APIService(authService: mockAuthService)

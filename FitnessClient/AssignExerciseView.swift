@@ -168,7 +168,7 @@ struct AssignExerciseView_Previews: PreviewProvider {
         let mockAuthService = AuthService()
         mockAuthService.authToken = "fake_preview_token"
         mockAuthService.loggedInUser = UserResponse(
-            id: "trainerPreview123", name: "Preview Trainer", email: "trainer@preview.com", role: "trainer",
+            id: "trainerPreview123", name: "Preview Trainer", email: "trainer@preview.com", roles: ["trainer"],
             createdAt: Date(), clientIds: nil, trainerId: nil
         )
         let mockAPIService = APIService(authService: mockAuthService)

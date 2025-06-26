@@ -174,7 +174,7 @@ struct TrainerExerciseListView_Previews: PreviewProvider {
         let mockAuthService = AuthService()
         // Simulate a logged-in trainer for the preview to enable the tab
         mockAuthService.authToken = "fake_token_for_preview"
-        mockAuthService.loggedInUser = UserResponse(id: "previewTrainer", name: "Preview Trainer", email: "preview@trainer.com", role: "trainer", createdAt: Date(), clientIds: nil, trainerId: nil)
+        mockAuthService.loggedInUser = UserResponse(id: "previewTrainer", name: "Preview Trainer", email: "preview@trainer.com", roles: ["trainer"], createdAt: Date(), clientIds: nil, trainerId: nil)
 
         let mockAPIService = APIService(authService: mockAuthService)
         

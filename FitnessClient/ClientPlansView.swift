@@ -84,7 +84,7 @@ struct ClientPlansView_Previews: PreviewProvider {
             id: "clientPreview1",
             name: "Client Preview User",
             email: "client@preview.com",
-            role: "client",
+            roles: ["client"],
             createdAt: Date(), // Ensure Date() is accessible
             clientIds: nil,
             trainerId: "trainer1"
