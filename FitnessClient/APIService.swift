@@ -44,16 +44,16 @@ class APIService: ObservableObject {
     // Custom JSONDecoder for consistent date parsing
     private var jsonDecoder: JSONDecoder {
         let decoder = JSONDecoder()
-//        let iso8601WithMillisecondsFormatter: DateFormatter = {
-//            let formatter = DateFormatter()
-//            formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
-//            formatter.calendar = Calendar(identifier: .iso8601)
-//            formatter.timeZone = TimeZone(secondsFromGMT: 0)
-//            formatter.locale = Locale(identifier: "en_US_POSIX")
-//            return formatter
-//        }()
-//        decoder.dateDecodingStrategy = .formatted(iso8601WithMillisecondsFormatter)
-        decoder.dateDecodingStrategy = .iso8601
+        let iso8601WithMillisecondsFormatter: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
+            formatter.calendar = Calendar(identifier: .iso8601)
+            formatter.timeZone = TimeZone(secondsFromGMT: 0)
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            return formatter
+        }()
+        decoder.dateDecodingStrategy = .formatted(iso8601WithMillisecondsFormatter)
+        //decoder.dateDecodingStrategy = .iso8601
         return decoder
     }
     
