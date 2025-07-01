@@ -2,13 +2,14 @@
 import Foundation
 import SwiftUI
 
+enum AppMode {
+    case client
+    case trainer
+}
+
 @MainActor
 class AppModeManager: ObservableObject {
     // Use an enum for the current mode for type safety
-    enum AppMode {
-        case client
-        case trainer
-    }
     
     // The currently selected viewing mode, defaults to client
     @Published var currentMode: AppMode = .client

@@ -12,6 +12,9 @@ struct SettingsView: View {
     // State for showing a confirmation alert before logging out (optional but good UX)
     @State private var showingLogoutAlert = false
     @State private var isActivatingTrainerRole = false
+    
+    // ViewModel for this view's logic
+    @ObservedObject var viewModel: SettingsViewModel
 
     var body: some View {
         NavigationView {
@@ -34,34 +37,42 @@ struct SettingsView: View {
                     }
 
                     // --- MODE SWITCHER (if user is both client and trainer) ---
-                    if user.hasRole(.client) && user.hasRole(.trainer) {
-                        Section("View Mode") {
-                            Picker("Current Mode", selection: $appModeManager.currentMode) {
-                                Text("Client View").tag(AppModeManager.AppMode.client)
-                                Text("Trainer View").tag(AppModeManager.AppMode.trainer)
-                            }
-                            .pickerStyle(.segmented)
-                        }
-                    }
-                    
-                    // --- ACTIVATE TRAINER ROLE (if user is only a client) ---
-                    if user.hasRole(.client) && !user.hasRole(.trainer) {
-                        Section("Become a Trainer") {
-                            if isActivatingTrainerRole {
-                                ProgressView("Activating...")
+//                    if user.hasRole(.client) && user.hasRole(.trainer) {
+//                        Section("View Mode") {
+//                            Picker("Current Mode", selection: $appModeManager.currentMode) {
+//                                Text("Client View").tag(AppMode.client)
+//                                Text("Trainer View").tag(AppMode.trainer)
+//                            }
+//                            .pickerStyle(.segmented)
+//                        }
+//                    }
+                    Section("Profile Role") {
+                        if let user = authService.loggedInUser, user.roles.contains("trainer") && user.roles.contains("client") {
+                            ModeSwitcherView() // New helper view for the switcher
+                        } else if let user = authService.loggedInUser, !user.roles.contains("trainer") {
+                            if viewModel.isLoading {
+                                ProgressView("Activating Trainer Profile...")
                             } else {
-                                Button("Activate Trainer Profile") {
+                                Button("Become a Trainer") {
                                     Task {
-                                        await activateTrainerRole()
+                                        await viewModel.activateTrainerRole()
+                                        // If successful, authService.loggedInUser will update,
+                                        // and this button will disappear. Show a toast.
+                                        if viewModel.errorMessage == nil {
+                                            toastManager.showToast(style: .success, message: "Trainer profile activated!")
+                                        } else {
+                                            toastManager.showToast(style: .error, message: viewModel.errorMessage!)
+                                        }
                                     }
                                 }
                             }
-                            Text("Activate the trainer dashboard to start managing your own clients.")
-                                .font(.caption)
+                        } else if let user = authService.loggedInUser, user.roles.contains("trainer") {
+                            Text("Trainer Profile is Active")
                                 .foregroundColor(.secondary)
                         }
+
+                        // TODO: UI for switching between modes if user has both roles
                     }
-                    
                     // --- LOGOUT SECTION ---
                     Section {
                         Button("Logout") {
@@ -116,25 +127,33 @@ struct SettingsView: View {
 // A helper struct for sending empty POST request bodies
 struct EmptyEncodable: Encodable {}
 
-// ... Preview Provider (needs to provide AppModeManager)
-struct SettingsView_Previews: PreviewProvider {
-    static func createPreview(roles: [String]) -> some View {
-        let mockAuth = AuthService()
-        mockAuth.authToken = "fake_token"
-        mockAuth.loggedInUser = UserResponse(id: "user123", name: "Preview User", email: "preview@example.com", roles: roles, createdAt: Date(), clientIds: nil, trainerId: nil)
-        let mockAPI = APIService(authService: mockAuth)
-        let mockModeManager = AppModeManager()
+// New helper view for the mode switcher
+struct ModeSwitcherView: View {
+    @EnvironmentObject var appModeManager: AppModeManager
+    
+    var body: some View {
+        Picker("Current Mode", selection: $appModeManager.currentMode) {
+            Text("Client View").tag(AppMode.client)
+            Text("Trainer View").tag(AppMode.trainer)
+        }
+        .pickerStyle(.segmented)
+    }
+}
 
-        return SettingsView()
+// Preview Provider for SettingsView
+struct SettingsView_Previews: PreviewProvider {
+    static var previews: some View {
+        let mockAuth = AuthService() // Simplified for preview
+        let mockAPI = APIService(authService: mockAuth)
+        let mockAppMode = AppModeManager()
+        let mockToast = ToastManager()
+        
+        let vm = SettingsViewModel(apiService: mockAPI, authService: mockAuth, appModeManager: mockAppMode)
+        
+        SettingsView(viewModel: vm)
             .environmentObject(mockAuth)
             .environmentObject(mockAPI)
-            .environmentObject(mockModeManager)
-    }
-
-    static var previews: some View {
-        Group {
-            createPreview(roles: ["client"]).previewDisplayName("As Client Only")
-            createPreview(roles: ["client", "trainer"]).previewDisplayName("As Dual Role")
-        }
+            .environmentObject(mockAppMode)
+            .environmentObject(mockToast)
     }
 }

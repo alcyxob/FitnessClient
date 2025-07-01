@@ -193,6 +193,20 @@ class AuthService: ObservableObject {
         print("AuthService: Pre-check response received. User exists: \(preCheckResponse.userExists)")
         return preCheckResponse.userExists
     }
+    
+    // --- NEW: Method to update user state after an action ---
+    func updateLoggedInUser(with updatedUser: UserResponse) {
+        // This method updates the global state and re-saves to Keychain
+        // so the new role persists across app launches.
+        guard self.authToken != nil else {
+            print("AuthService: Attempted to update user but no auth token exists. Aborting.")
+            return
+        }
+        self.loggedInUser = updatedUser
+        // Re-save the updated user object to the Keychain
+        saveTokenAndUserToKeychain(token: self.authToken!, user: updatedUser)
+        print("AuthService: Global user state and Keychain updated with new roles.")
+    }
 
     private func loadTokenAndUserFromKeychain() {
         do {
