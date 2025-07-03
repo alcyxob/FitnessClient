@@ -6,40 +6,39 @@ struct TrainerClientsView: View {
     @EnvironmentObject var apiService: APIService
     @EnvironmentObject var authService: AuthService
     @EnvironmentObject var toastManager: ToastManager
+    @Environment(\.appTheme) var theme
     @State private var showingAddClientSheet = false
 
     var body: some View {
         NavigationView {
-            ZStack {
-                if viewModel.isLoading && viewModel.items.isEmpty {
-                    // Show loading for initial load
-                    ProgressView("Loading clients...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if viewModel.items.isEmpty && !viewModel.isLoading {
-                    // Show empty state
-                    EmptyStateView(
-                        title: "No Clients Yet",
-                        message: "Add your first client to get started with training plans and workouts.",
-                        systemImage: "person.2",
-                        actionTitle: "Add Client"
-                    ) {
-                        showingAddClientSheet = true
-                    }
-                } else {
-                    // Show client list
-                    clientListView
-                }
-            }
-            .navigationTitle("My Clients")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showingAddClientSheet = true
-                    } label: {
-                        Label("Add Client", systemImage: "plus.circle.fill")
+            VStack(spacing: 0) {
+                // Themed header
+                RoleHeaderView(
+                    "My Clients",
+                    subtitle: "Manage and track your clients' progress"
+                )
+                
+                // Main content
+                ZStack {
+                    theme.background.ignoresSafeArea()
+                    
+                    if viewModel.isLoading && viewModel.items.isEmpty {
+                        ThemedProgressView(message: "Loading clients...")
+                    } else if viewModel.items.isEmpty && !viewModel.isLoading {
+                        ThemedEmptyState(
+                            title: "No Clients Yet",
+                            message: "Add your first client to get started with creating personalized training plans and tracking their progress.",
+                            icon: "person.2.badge.plus",
+                            actionTitle: "Add Client"
+                        ) {
+                            showingAddClientSheet = true
+                        }
+                    } else {
+                        clientListView
                     }
                 }
             }
+            .navigationBarHidden(true)
             .refreshable {
                 await viewModel.refreshClients()
             }
@@ -66,85 +65,113 @@ struct TrainerClientsView: View {
     }
     
     private var clientListView: some View {
-        List {
-            ForEach(viewModel.items) { client in
-                NavigationLink {
-                    ClientDetailView(
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                // Add client button at top
+                ThemedCard {
+                    Button(action: {
+                        showingAddClientSheet = true
+                    }) {
+                        HStack {
+                            Image(systemName: "person.badge.plus")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundColor(theme.primary)
+                            
+                            Text("Add New Client")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(theme.primary)
+                            
+                            Spacer()
+                            
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 24))
+                                .foregroundColor(theme.primary)
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                
+                // Clients list
+                ForEach(viewModel.items, id: \.id) { client in
+                    NavigationLink(destination: ClientDetailView(
                         client: client,
                         apiService: apiService,
                         authService: authService
-                    )
-                } label: {
-                    ClientRowView(client: client)
+                    )) {
+                        ThemedClientRow(client: client)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .padding(.horizontal, 16)
                 }
             }
+            .padding(.bottom, 20)
         }
-        .listStyle(.plain)
     }
 }
 
-struct ClientRowView: View {
+struct ThemedClientRow: View {
+    @Environment(\.appTheme) var theme
     let client: UserResponse
     
     var body: some View {
-        HStack {
-            // Avatar placeholder
-            Circle()
-                .fill(Color.blue.opacity(0.2))
-                .frame(width: 40, height: 40)
-                .overlay(
+        ThemedCard {
+            HStack(spacing: 16) {
+                // Avatar
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [theme.primary, theme.secondary],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 50, height: 50)
+                    
                     Text(client.name.prefix(1).uppercased())
-                        .font(.headline)
-                        .foregroundColor(.blue)
-                )
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(client.name)
-                    .font(.headline)
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(.white)
+                }
                 
-                Text(client.email)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                // Client info
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(client.name)
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(theme.primaryText)
+                    
+                    Text(client.email)
+                        .font(.subheadline)
+                        .foregroundColor(theme.secondaryText)
+                    
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.circle")
+                            .font(.caption)
+                            .foregroundColor(theme.accent)
+                        
+                        Text("Active Client")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(theme.accent)
+                    }
+                }
+                
+                Spacer()
+                
+                // Chevron
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(theme.tertiaryText)
             }
-            
-            Spacer()
-            
-            Image(systemName: "chevron.right")
-                .foregroundColor(.secondary)
-                .font(.caption)
         }
-        .padding(.vertical, 4)
     }
 }
 
-// Updated Preview Provider
-struct TrainerClientsView_Previews: PreviewProvider {
-    struct MinimalPreviewWrapper: View {
-        @StateObject var viewModel: TrainerClientsViewModel
-
-        var body: some View {
-            TrainerClientsView(viewModel: viewModel)
-        }
-    }
-
-    static var previews: some View {
-        let mockAuthService = AuthService()
-        mockAuthService.authToken = "fake_token_for_preview"
-        mockAuthService.loggedInUser = UserResponse(id: "previewTrainer", name: "Preview Trainer", email: "preview@trainer.com", roles: ["trainer"], createdAt: Date(), clientIds: nil, trainerId: nil)
-        let mockAPIService = APIService(authService: mockAuthService)
-
-        let vmData: TrainerClientsViewModel = {
-             let vm = TrainerClientsViewModel(apiService: mockAPIService)
-             vm.updateItems([
-                UserResponse(id: "client1", name: "Alice Example", email: "alice@example.com", roles: ["client"], createdAt: Date(), clientIds: nil, trainerId: "previewTrainer"),
-                UserResponse(id: "client2", name: "Bob Sample", email: "bob@sample.com", roles: ["client"], createdAt: Date(), clientIds: nil, trainerId: "previewTrainer")
-             ])
-             return vm
-        }()
-
-        return MinimalPreviewWrapper(viewModel: vmData)
-            .environmentObject(mockAuthService)
-            .environmentObject(mockAPIService)
-            .environmentObject(ToastManager())
-    }
+#Preview {
+    TrainerClientsView(viewModel: TrainerClientsViewModel(apiService: APIService(authService: AuthService())))
+        .environmentObject(AuthService())
+        .environmentObject(ToastManager())
+        .environment(\.appTheme, AppTheme.trainer)
 }

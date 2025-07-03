@@ -4,7 +4,9 @@ import SwiftUI
 struct MainTabView: View {
     @EnvironmentObject var authService: AuthService
     @EnvironmentObject var apiService: APIService
-    @EnvironmentObject var appModeManager: AppModeManager // Get from environment
+    @EnvironmentObject var appModeManager: AppModeManager
+    @EnvironmentObject var themeManager: AppThemeManager
+    @Environment(\.appTheme) var theme
 
     var body: some View {
         TabView {
@@ -23,25 +25,43 @@ struct MainTabView: View {
                 Text("Loading...")
             }
         }
+        .accentColor(theme.primary)
+        .background(theme.background)
+        .onAppear {
+            // Configure tab bar appearance based on theme
+            configureTabBarAppearance()
+        }
+        .onChange(of: themeManager.currentTheme) { _ in
+            // Update tab bar when theme changes
+            configureTabBarAppearance()
+        }
     }
 
     // Helper for Client-specific tabs
     @ViewBuilder
     private var clientTabs: some View {
         ClientDashboardView(apiService: apiService, authService: authService)
-            .tabItem { Label("Today", systemImage: "figure.mixed.cardio") }
+            .tabItem { 
+                Label("Today", systemImage: "figure.mixed.cardio")
+            }
             .tag(0)
 
         ClientPlansView(apiService: apiService)
-            .tabItem { Label("My Plans", systemImage: "list.star") }
+            .tabItem { 
+                Label("My Plans", systemImage: "list.star") 
+            }
             .tag(1)
         
         Text("Client Progress (Placeholder)")
-            .tabItem { Label("Progress", systemImage: "chart.bar.xaxis") }
+            .tabItem { 
+                Label("Progress", systemImage: "chart.bar.xaxis") 
+            }
             .tag(2)
 
-        SettingsView(viewModel: SettingsViewModel(apiService: apiService, authService: authService, appModeManager: appModeManager)) // Pass appModeManager
-            .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+        SettingsView(viewModel: SettingsViewModel(apiService: apiService, authService: authService, appModeManager: appModeManager))
+            .tabItem { 
+                Label("Settings", systemImage: "gearshape.fill") 
+            }
             .tag(3)
     }
 
@@ -49,19 +69,50 @@ struct MainTabView: View {
     @ViewBuilder
     private var trainerTabs: some View {
         TrainerDashboardView(apiService: apiService, authService: authService)
-            .tabItem { Label("Dashboard", systemImage: "list.clipboard.fill") }
+            .tabItem { 
+                Label("Dashboard", systemImage: "chart.bar.doc.horizontal") 
+            }
             .tag(0)
 
         TrainerExerciseListView(viewModel: TrainerExerciseListViewModel(apiService: apiService, authService: authService))
-            .tabItem { Label("My Exercises", systemImage: "figure.run.circle.fill") }
+            .tabItem { 
+                Label("Exercises", systemImage: "figure.strengthtraining.traditional") 
+            }
             .tag(1)
 
         TrainerClientsView(viewModel: TrainerClientsViewModel(apiService: apiService))
-            .tabItem { Label("My Clients", systemImage: "person.2.fill") }
+            .tabItem { 
+                Label("Clients", systemImage: "person.2.fill") 
+            }
             .tag(2)
         
-        SettingsView(viewModel: SettingsViewModel(apiService: apiService, authService: authService, appModeManager: appModeManager)) // Pass appModeManager
-            .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+        SettingsView(viewModel: SettingsViewModel(apiService: apiService, authService: authService, appModeManager: appModeManager))
+            .tabItem { 
+                Label("Settings", systemImage: "gearshape.fill") 
+            }
             .tag(3)
+    }
+    
+    private func configureTabBarAppearance() {
+        let appearance = UITabBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        
+        // Set background color
+        appearance.backgroundColor = UIColor(theme.tabBarBackground)
+        
+        // Set selected item color
+        appearance.stackedLayoutAppearance.selected.iconColor = UIColor(theme.tabBarSelected)
+        appearance.stackedLayoutAppearance.selected.titleTextAttributes = [
+            .foregroundColor: UIColor(theme.tabBarSelected)
+        ]
+        
+        // Set unselected item color
+        appearance.stackedLayoutAppearance.normal.iconColor = UIColor(theme.tabBarUnselected)
+        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [
+            .foregroundColor: UIColor(theme.tabBarUnselected)
+        ]
+        
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
     }
 }

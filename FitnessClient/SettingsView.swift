@@ -62,7 +62,7 @@ struct SettingsView: View {
 //                            .pickerStyle(.segmented)
 //                        }
 //                    }
-                    Section("Profile Role") {
+                    Section("App Role") {
                         if let user = authService.loggedInUser, user.roles.contains("trainer") && user.roles.contains("client") {
                             ModeSwitcherView() // New helper view for the switcher
                         } else if let user = authService.loggedInUser, !user.roles.contains("trainer") {
@@ -146,13 +146,108 @@ struct EmptyEncodable: Encodable {}
 // New helper view for the mode switcher
 struct ModeSwitcherView: View {
     @EnvironmentObject var appModeManager: AppModeManager
+    @EnvironmentObject var toastManager: ToastManager
+    @Environment(\.appTheme) var theme
     
     var body: some View {
-        Picker("Current Mode", selection: $appModeManager.currentMode) {
-            Text("Client View").tag(AppMode.client)
-            Text("Trainer View").tag(AppMode.trainer)
+        ThemedCard {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Image(systemName: "person.2.badge.gearshape")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(theme.primary)
+                    
+                    Text("App Role")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(theme.primaryText)
+                    
+                    Spacer()
+                    
+                    // Subtle theme color indicator
+                    HStack(spacing: 3) {
+                        Circle()
+                            .fill(theme.primary)
+                            .frame(width: 8, height: 8)
+                        Circle()
+                            .fill(theme.secondary)
+                            .frame(width: 8, height: 8)
+                        Circle()
+                            .fill(theme.accent)
+                            .frame(width: 8, height: 8)
+                    }
+                }
+                
+                // Role switcher buttons
+                HStack(spacing: 8) {
+                    ForEach(AppMode.allCases, id: \.self) { mode in
+                        Button(action: {
+                            if appModeManager.currentMode != mode {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    appModeManager.switchTo(mode: mode)
+                                }
+                                
+                                // Show confirmation toast
+                                let message = "Switched to \(mode.displayName) role"
+                                toastManager.showToast(style: .success, message: message)
+                                
+                                // Add haptic feedback
+                                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                                impactFeedback.impactOccurred()
+                            }
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: mode.icon)
+                                    .font(.system(size: 16, weight: .semibold))
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(mode.displayName)
+                                        .font(.system(size: 15, weight: .semibold))
+                                    
+                                    Text(mode.description)
+                                        .font(.system(size: 11, weight: .medium))
+                                        .opacity(0.8)
+                                        .multilineTextAlignment(.leading)
+                                }
+                            }
+                            .foregroundColor(
+                                appModeManager.currentMode == mode ? 
+                                theme.onPrimary : theme.primaryText
+                            )
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 12)
+                            .background(
+                                appModeManager.currentMode == mode ? 
+                                theme.primary : theme.surface
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(
+                                        appModeManager.currentMode == mode ? 
+                                        Color.clear : theme.primary.opacity(0.2),
+                                        lineWidth: 1
+                                    )
+                            )
+                            .cornerRadius(10)
+                        }
+                        .disabled(appModeManager.currentMode == mode)
+                    }
+                }
+                
+                // Simple persistence note
+                HStack {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundColor(theme.success)
+                    
+                    Text("Your selection is automatically saved")
+                        .font(.caption)
+                        .foregroundColor(theme.secondaryText)
+                }
+            }
         }
-        .pickerStyle(.segmented)
+        .padding(.horizontal, 16)
     }
 }
 

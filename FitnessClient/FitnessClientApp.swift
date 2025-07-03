@@ -16,12 +16,18 @@ struct FitnessClientApp: App {
     @StateObject private var apiService: APIService
     @StateObject private var toastManager = ToastManager()
     @StateObject private var appModeManager = AppModeManager()
+    @StateObject private var themeManager: AppThemeManager
 
     init() {
         // Initialize authService first as apiService depends on it
         let auth = AuthService()
         _authService = StateObject(wrappedValue: auth) // Assign to the @StateObject property wrapper
         _apiService = StateObject(wrappedValue: APIService(authService: auth))
+        
+        // Initialize theme manager with app mode manager
+        let modeManager = AppModeManager()
+        _appModeManager = StateObject(wrappedValue: modeManager)
+        _themeManager = StateObject(wrappedValue: AppThemeManager(appModeManager: modeManager))
     }
     
     var body: some Scene {
@@ -32,6 +38,8 @@ struct FitnessClientApp: App {
                 .environmentObject(apiService) // Make apiService available
                 .environmentObject(toastManager)
                 .environmentObject(appModeManager)
+                .environmentObject(themeManager)
+                .environment(\.appTheme, themeManager.currentTheme)
                 .toastView(toast: $toastManager.currentToast) // <<< APPLY MODIFIER
         }
     }
