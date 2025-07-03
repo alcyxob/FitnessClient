@@ -1,6 +1,8 @@
 // AuthService.swift
 import Foundation
-import KeychainAccess // Import the library
+import KeychainAccess
+import LocalAuthentication // For biometric authentication
+import UIKit // For UIDevice access
 
 // DTO for pre-check request
 struct ApplePreCheckRequest: Codable {
@@ -27,28 +29,131 @@ class AuthService: ObservableObject {
 
     private let baseURL = URL(string: "https://dev-api.fitnessapp.jutechnik.com/api/v1")!
 
-    // --- Keychain Configuration ---
-    // Use a unique service name for your app to avoid conflicts.
-    // The bundle identifier is a good choice.
+    // --- Enhanced Keychain Configuration ---
     private let keychainService = Bundle.main.bundleIdentifier ?? "com.example.fitnessclient.keychain"
-    private let keychainAuthTokenKey = "authToken" // Key to store the token under
-    private let keychainUserKey = "loggedInUser"   // Key to store user data (optional)
-
+    private let keychainAuthTokenKey = "authToken"
+    private let keychainUserKey = "loggedInUser"
+    
+    // Biometric authentication settings
+    @Published var biometricAuthEnabled = false
+    @Published var biometricType: LABiometryType = .none
+    
     private var keychain: Keychain {
-        // By default, KeychainAccess items are shared across apps from the same developer
-        // if they share an access group. For a single app, this is fine.
-        // For more security or if you need iCloud syncing, explore access groups.
-        return Keychain(service: keychainService)
+        let keychain = Keychain(service: keychainService)
+        // Use basic accessibility for now to avoid crashes
+        return keychain.accessibility(.whenUnlockedThisDeviceOnly)
+    }
+    
+    // Separate keychain for sensitive data
+    private var secureKeychain: Keychain {
+        let keychain = Keychain(service: keychainService + ".secure")
+        
+        // Only add biometric protection if it's available and enabled
+        if biometricAuthEnabled && biometricType != .none {
+            return keychain
+                .accessibility(.whenPasscodeSetThisDeviceOnly)
+                .authenticationPrompt("Authenticate to access your account")
+        } else {
+            return keychain.accessibility(.whenUnlockedThisDeviceOnly)
+        }
     }
 
     // --- Initializer ---
     init() {
+        // Check biometric availability safely
+        do {
+            checkBiometricAvailability()
+        } catch {
+            print("AuthService: Error checking biometric availability: \(error)")
+            biometricType = .none
+        }
+        
+        // Load biometric preference from UserDefaults safely
+        biometricAuthEnabled = UserDefaults.standard.bool(forKey: "biometricAuthEnabled")
+        
         // Attempt to load token and user from Keychain when the service is created
-        loadTokenAndUserFromKeychain()
-        if authToken != nil {
-            print("AuthService: Session loaded from Keychain. User: \(loggedInUser?.email ?? "N/A")")
+        do {
+            loadTokenAndUserFromKeychain()
+            if authToken != nil {
+                print("AuthService: Session loaded from Keychain. User: \(loggedInUser?.email ?? "N/A")")
+            } else {
+                print("AuthService: No active session found in Keychain.")
+            }
+        } catch {
+            print("AuthService: Error loading from keychain: \(error)")
+            // Clear any partial state
+            self.authToken = nil
+            self.loggedInUser = nil
+        }
+        
+        // Listen for authentication required notifications
+        NotificationCenter.default.addObserver(
+            forName: .authenticationRequired,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleAuthenticationRequired()
+        }
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+    
+    // --- Enhanced Error Handling ---
+    private func handleAuthError(_ error: Error, context: String = "") {
+        let appError: AppError
+        
+        if let apiError = error as? APINetworkError {
+            switch apiError {
+            case .unauthorized:
+                appError = .unauthorized
+            case .requestFailed(let underlyingError):
+                appError = convertNetworkError(underlyingError)
+            case .decodingError:
+                appError = .decodingFailed
+            case .serverError(let statusCode, let message):
+                appError = .serverError(statusCode: statusCode, message: message)
+            default:
+                appError = .authenticationFailed
+            }
         } else {
-            print("AuthService: No active session found in Keychain.")
+            appError = .authenticationFailed
+        }
+        
+        // Set local error state
+        errorMessage = appError.localizedDescription
+        
+        // Report to global error manager
+        ErrorManager.shared.handle(appError, context: "AuthService: \(context)")
+        
+        print("🚨 AuthService Error (\(context)): \(appError.localizedDescription ?? "Unknown error")")
+    }
+    
+    private func convertNetworkError(_ error: Error) -> AppError {
+        let nsError = error as NSError
+        
+        switch nsError.code {
+        case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost:
+            return .networkUnavailable
+        case NSURLErrorTimedOut:
+            return .requestTimeout
+        case NSURLErrorCannotFindHost, NSURLErrorCannotConnectToHost:
+            return .serverUnavailable
+        default:
+            return .unknown(error.localizedDescription)
+        }
+    }
+    
+    private func clearError() {
+        errorMessage = nil
+        ErrorManager.shared.clearError()
+    }
+    
+    private func handleAuthenticationRequired() {
+        // Force logout when authentication is required
+        Task {
+            await logout()
         }
     }
     
@@ -67,7 +172,7 @@ class AuthService: ObservableObject {
         guard !isLoading else { return }
 
         isLoading = true
-        errorMessage = nil
+        clearError()
         let loginURL = baseURL.appendingPathComponent("auth/login")
 
         do {
@@ -81,7 +186,7 @@ class AuthService: ObservableObject {
             let (data, response) = try await URLSession.shared.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                throw URLError(.cannotParseResponse)
+                throw APINetworkError.requestFailed(URLError(.cannotParseResponse))
             }
             print("Received status code: \(httpResponse.statusCode)")
 
@@ -109,26 +214,26 @@ class AuthService: ObservableObject {
                 self.loggedInUser = loginResponse.user
                 print("AuthService: authToken set to: \(self.authToken ?? "NIL TOKEN")")
                 print("AuthService: loggedInUser set to email: \(self.loggedInUser?.email ?? "NIL USER")")
-                self.errorMessage = nil
 
             } else {
+                // Handle HTTP error responses
+                let errorMessage: String
                 do {
                     let errorResponse = try decoder.decode(APIErrorResponse.self, from: data)
-                    throw APIErrorResponse(error: errorResponse.error)
+                    errorMessage = errorResponse.error
                 } catch {
-                    let genericError = "Login failed with status: \(httpResponse.statusCode)"
-                    print("Failed to decode error response body, using generic error.")
-                    throw APIErrorResponse(error: genericError)
+                    errorMessage = "Login failed with status: \(httpResponse.statusCode)"
+                }
+                
+                if httpResponse.statusCode == 401 {
+                    throw APINetworkError.unauthorized
+                } else {
+                    throw APINetworkError.serverError(statusCode: httpResponse.statusCode, message: errorMessage)
                 }
             }
-        } catch let apiError as APIErrorResponse {
-            print("API Error: \(apiError.error)")
-            self.errorMessage = apiError.error
-            await clearSession() // Clear session on API error during login
         } catch {
-            print("Login Error: \(error.localizedDescription)")
-            self.errorMessage = "An unexpected error occurred: \(error.localizedDescription)"
-            await clearSession() // Clear session on other errors
+            handleAuthError(error, context: "Login")
+            await clearSession() // Clear session on error during login
         }
         isLoading = false
     }
@@ -139,15 +244,102 @@ class AuthService: ObservableObject {
         print("User logged out. Session cleared from Keychain.")
     }
 
-    // --- Keychain Helper Methods ---
+    // --- Biometric Authentication Methods ---
+    
+    private func checkBiometricAvailability() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async {
+                self.checkBiometricAvailability()
+            }
+            return
+        }
+        
+        let context = LAContext()
+        var error: NSError?
+        
+        // Use .deviceOwnerAuthenticationWithBiometrics for iOS compatibility
+        let canEvaluate = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
+        
+        if canEvaluate {
+            biometricType = context.biometryType
+            print("AuthService: Biometric authentication available: \(biometricType.rawValue)")
+        } else {
+            biometricType = .none
+            if let error = error {
+                print("AuthService: Biometric authentication not available: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    func enableBiometricAuth() async -> Bool {
+        guard biometricType != .none else {
+            print("AuthService: Biometric authentication not available on this device")
+            return false
+        }
+        
+        let context = LAContext()
+        let reason = "Enable biometric authentication to secure your fitness app"
+        
+        do {
+            // Use .deviceOwnerAuthenticationWithBiometrics for iOS compatibility
+            let success = try await context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason)
+            if success {
+                biometricAuthEnabled = true
+                UserDefaults.standard.set(true, forKey: "biometricAuthEnabled")
+                print("AuthService: Biometric authentication enabled")
+                
+                // Re-save current session with biometric protection
+                if let token = authToken, let user = loggedInUser {
+                    saveTokenAndUserToKeychain(token: token, user: user)
+                }
+                return true
+            }
+        } catch {
+            print("AuthService: Failed to enable biometric authentication: \(error.localizedDescription)")
+        }
+        return false
+    }
+    
+    func disableBiometricAuth() {
+        biometricAuthEnabled = false
+        UserDefaults.standard.set(false, forKey: "biometricAuthEnabled")
+        print("AuthService: Biometric authentication disabled")
+        
+        // Re-save current session without biometric protection
+        if let token = authToken, let user = loggedInUser {
+            saveTokenAndUserToKeychain(token: token, user: user)
+        }
+    }
+    
+    func authenticateWithBiometrics() async -> Bool {
+        guard biometricAuthEnabled && biometricType != .none else {
+            return true // Skip if not enabled
+        }
+        
+        let context = LAContext()
+        let reason = "Authenticate to access your fitness data"
+        
+        do {
+            // Use .deviceOwnerAuthenticationWithBiometrics for iOS compatibility
+            let success = try await context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason)
+            print("AuthService: Biometric authentication \(success ? "successful" : "failed")")
+            return success
+        } catch {
+            print("AuthService: Biometric authentication error: \(error.localizedDescription)")
+            return false
+        }
+    }
+    // --- Enhanced Keychain Helper Methods ---
+    
     private func saveTokenAndUserToKeychain(token: String, user: UserResponse) {
         do {
-            print("AuthService: Saving to Keychain. Token length: \(token.count), User roles: \(user.roles)")
-            try keychain.set(token, key: keychainAuthTokenKey)
+            print("AuthService: Saving to Keychain with enhanced security. Token length: \(token.count), User roles: \(user.roles)")
+            
+            // Use secure keychain for sensitive auth token
+            try secureKeychain.set(token, key: keychainAuthTokenKey)
 
             let encoder = JSONEncoder()
-            // --- USE THE CUSTOM FORMATTER FOR ENCODING ---
-            let iso8601WithMillisecondsFormatter: DateFormatter = { // You can define this once in the class if preferred
+            let iso8601WithMillisecondsFormatter: DateFormatter = {
                 let formatter = DateFormatter()
                 formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
                 formatter.calendar = Calendar(identifier: .iso8601)
@@ -156,14 +348,103 @@ class AuthService: ObservableObject {
                 return formatter
             }()
             encoder.dateEncodingStrategy = .formatted(iso8601WithMillisecondsFormatter)
-            // --- END CHANGE ---
 
             let userData = try encoder.encode(user)
+            
+            // Use regular keychain for user data (less sensitive)
             try keychain.set(userData, key: keychainUserKey)
 
-            print("Token and user data saved to Keychain.")
+            print("AuthService: Token and user data saved to Keychain with enhanced security.")
         } catch {
-            print("Error saving to Keychain: \(error.localizedDescription)")
+            print("AuthService: Error saving to Keychain: \(error.localizedDescription)")
+            // If keychain save fails, clear the session to prevent inconsistent state
+            Task {
+                await clearSession()
+            }
+        }
+    }
+    
+    private func loadTokenAndUserFromKeychain() {
+        do {
+            // Load auth token from secure keychain
+            if let token = try secureKeychain.get(keychainAuthTokenKey), !token.isEmpty {
+                self.authToken = token
+
+                // Load user data from regular keychain
+                if let userData = try keychain.getData(keychainUserKey), !userData.isEmpty {
+                    let decoder = JSONDecoder()
+                    let iso8601WithMillisecondsFormatter: DateFormatter = {
+                        let formatter = DateFormatter()
+                        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
+                        formatter.calendar = Calendar(identifier: .iso8601)
+                        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+                        formatter.locale = Locale(identifier: "en_US_POSIX")
+                        return formatter
+                    }()
+                    decoder.dateDecodingStrategy = .formatted(iso8601WithMillisecondsFormatter)
+
+                    self.loggedInUser = try decoder.decode(UserResponse.self, from: userData)
+                    print("AuthService: Successfully loaded session from secure keychain")
+                } else {
+                    // Token found but no user data, something is inconsistent
+                    print("AuthService: Token found, but user data missing. Clearing session for security.")
+                    try? secureKeychain.remove(keychainAuthTokenKey)
+                    self.authToken = nil
+                    self.loggedInUser = nil
+                }
+            } else {
+                self.authToken = nil
+                self.loggedInUser = nil
+            }
+        } catch {
+            print("AuthService: Error loading from Keychain: \(error.localizedDescription)")
+            // If there's an error (like biometric auth failed), treat as no session
+            self.authToken = nil
+            self.loggedInUser = nil
+        }
+    }
+
+    private func clearSession() async {
+        do {
+            // Clear from both keychains
+            try secureKeychain.remove(keychainAuthTokenKey)
+            try keychain.remove(keychainUserKey)
+            print("AuthService: Keychain data cleared from both secure and regular keychains.")
+        } catch {
+            print("AuthService: Error clearing Keychain: \(error.localizedDescription)")
+        }
+        
+        // Clear published properties
+        self.authToken = nil
+        self.loggedInUser = nil
+        self.errorMessage = nil
+    }
+    
+    func updateStoredUser(user: UserResponse) {
+        // This method updates the user object in Keychain without touching the token.
+        guard self.authToken != nil else {
+            print("AuthService: Attempted to update user but no auth token exists. Aborting.")
+            return
+        }
+        
+        do {
+            let encoder = JSONEncoder()
+            let iso8601WithMillisecondsFormatter: DateFormatter = {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
+                formatter.calendar = Calendar(identifier: .iso8601)
+                formatter.timeZone = TimeZone(secondsFromGMT: 0)
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                return formatter
+            }()
+            encoder.dateEncodingStrategy = .formatted(iso8601WithMillisecondsFormatter)
+            
+            let userData = try encoder.encode(user)
+            try keychain.set(userData, key: keychainUserKey)
+            self.loggedInUser = user
+            print("AuthService: Updated user data in Keychain securely.")
+        } catch {
+            print("AuthService: Error updating user data in Keychain: \(error.localizedDescription)")
         }
     }
     
@@ -208,62 +489,7 @@ class AuthService: ObservableObject {
         print("AuthService: Global user state and Keychain updated with new roles.")
     }
 
-    private func loadTokenAndUserFromKeychain() {
-        do {
-            // Load auth token
-            if let token = try keychain.get(keychainAuthTokenKey) {
-                self.authToken = token
 
-                // Load user data
-                if let userData = try keychain.getData(keychainUserKey) {
-                    let decoder = JSONDecoder()
-                    // Make sure date decoding strategy matches how you stored it
-                    let iso8601WithMillisecondsFormatter: DateFormatter = {
-                        let formatter = DateFormatter()
-                        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
-                        formatter.calendar = Calendar(identifier: .iso8601)
-                        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-                        formatter.locale = Locale(identifier: "en_US_POSIX")
-                        return formatter
-                    }()
-                    decoder.dateDecodingStrategy = .formatted(iso8601WithMillisecondsFormatter)
-
-                    self.loggedInUser = try decoder.decode(UserResponse.self, from: userData)
-                } else {
-                    // Token found but no user data, something is inconsistent
-                    // Consider this an invalid session and clear the token
-                    print("Keychain: Token found, but user data missing. Clearing token.")
-                    try keychain.remove(keychainAuthTokenKey)
-                    self.authToken = nil
-                    self.loggedInUser = nil
-                }
-            } else {
-                self.authToken = nil
-                self.loggedInUser = nil
-            }
-        } catch {
-            print("Error loading from Keychain: \(error.localizedDescription)")
-            // Assume no valid session if there's an error
-            self.authToken = nil
-            self.loggedInUser = nil
-        }
-    }
-
-    // Made this async in case keychain operations become async in future library versions
-    // or if you add other async cleanup.
-    private func clearSession() async {
-        do {
-            try keychain.remove(keychainAuthTokenKey)
-            try keychain.remove(keychainUserKey) // Remove user data too
-            print("Keychain data cleared.")
-        } catch {
-            print("Error clearing Keychain: \(error.localizedDescription)")
-        }
-        // Clear published properties
-        self.authToken = nil
-        self.loggedInUser = nil
-        self.errorMessage = nil // Also clear error message on logout
-    }
 
     // --- NEW: Finalize Apple Sign-In by calling your backend ---
      func finalizeAppleSignIn(
@@ -349,28 +575,7 @@ class AuthService: ObservableObject {
          isLoading = false
      }
     
-    func updateStoredUser(user: UserResponse) {
-        // This method updates the user object in Keychain without touching the token.
-        // It's called after an action like activating a trainer role.
-        do {
-            let encoder = JSONEncoder()
-            let iso8601WithMillisecondsFormatter: DateFormatter = {
-                let formatter = DateFormatter()
-                formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
-                formatter.calendar = Calendar(identifier: .iso8601)
-                formatter.timeZone = TimeZone(secondsFromGMT: 0)
-                formatter.locale = Locale(identifier: "en_US_POSIX")
-                return formatter
-            }()
-            encoder.dateEncodingStrategy = .formatted(iso8601WithMillisecondsFormatter)
-            
-            let userData = try encoder.encode(user)
-            try keychain.set(userData, key: keychainUserKey)
-            print("AuthService: Updated user data in Keychain.")
-        } catch {
-            print("AuthService: Error updating user data in Keychain: \(error.localizedDescription)")
-        }
-    }
+
     
     // --- NEW: Method to call your backend after Apple Sign In ---
     func handleAppleSignIn(

@@ -35,6 +35,22 @@ struct SettingsView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
+                    
+                    // --- SECURITY SETTINGS ---
+                    Section(header: Text("Security")) {
+                        NavigationLink(destination: BiometricSettingsView()) {
+                            HStack {
+                                Image(systemName: "shield.lefthalf.filled")
+                                    .foregroundColor(.blue)
+                                Text("Biometric Authentication")
+                                Spacer()
+                                if authService.biometricAuthEnabled {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(.green)
+                                }
+                            }
+                        }
+                    }
 
                     // --- MODE SWITCHER (if user is both client and trainer) ---
 //                    if user.hasRole(.client) && user.hasRole(.trainer) {

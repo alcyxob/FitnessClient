@@ -7,5 +7,14 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	
+	<!-- Privacy Usage Descriptions for Biometric Authentication -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>This app uses Face ID to securely authenticate you and protect your fitness data. Your biometric information is stored securely on your device and never shared.</string>
+	
+	<!-- Note: NSFaceIDUsageDescription covers both Face ID and Touch ID in iOS 11+ -->
+	<!-- But we can also add the legacy Touch ID description for older iOS versions -->
+	<key>NSBiometricAuthenticationUsageDescription</key>
+	<string>This app uses biometric authentication (Touch ID or Face ID) to securely protect your fitness data and provide quick access to your account.</string>
 </dict>
 </plist>

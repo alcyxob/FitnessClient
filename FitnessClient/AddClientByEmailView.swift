@@ -4,6 +4,8 @@ import SwiftUI
 struct AddClientByEmailView: View {
     @StateObject var viewModel: AddClientViewModel
     @Environment(\.dismiss) var dismiss // To close the sheet
+    
+    @State private var showingNotFoundAlert = false
 
     init(apiService: APIService, toastManager: ToastManager) {
         // View creates its own ViewModel instance
@@ -45,7 +47,7 @@ struct AddClientByEmailView: View {
                     .disabled(viewModel.clientEmail.isEmpty || viewModel.isLoading)
                 }
 
-                if let errorMessage = viewModel.errorMessage {
+                if let errorMessage = viewModel.errorMessage, !isNotFoundError(errorMessage) {
                     Text(errorMessage)
                         .foregroundColor(.red)
                         .padding(.top)
@@ -69,7 +71,26 @@ struct AddClientByEmailView: View {
                     dismiss() // Dismiss sheet on success
                 }
             }
+            .onChange(of: viewModel.errorMessage) { newErrorMessage in
+                if let msg = newErrorMessage, isNotFoundError(msg) {
+                    self.showingNotFoundAlert = true
+                }
+            }
+            .alert("Client Not Found", isPresented: $showingNotFoundAlert) {
+                Button("OK") {
+                    // Optionally clear the error message when alert is dismissed
+                    viewModel.errorMessage = nil
+                }
+            } message: {
+                Text("No client with the email '\(viewModel.clientEmail)' was found, or they are not available to be added. Please check the email and try again.")
+            }
         }
+    }
+
+    // Helper to check for the specific error message
+    private func isNotFoundError(_ message: String) -> Bool {
+        // Match the error string set by your Go backend for ErrClientNotFound
+        return message.lowercased().contains("404")
     }
 }
 
