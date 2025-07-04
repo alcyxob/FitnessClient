@@ -127,6 +127,33 @@ struct Assignment: Codable, Identifiable, Hashable, Equatable { // Added Equatab
     // unless your API explicitly nests the full exercise object within each assignment.
     // If it's populated manually after fetching, it needs to be handled for Codable conformance.
     var exercise: Exercise?
+    
+    // MARK: - Computed Display Properties
+    
+    var displayReps: String {
+        return reps ?? "As prescribed"
+    }
+    
+    var displayWeight: String {
+        if let weight = weight, !weight.isEmpty {
+            return weight
+        }
+        return "Bodyweight"
+    }
+    
+    var displayDuration: String {
+        if let duration = duration, !duration.isEmpty {
+            return duration
+        }
+        return ""
+    }
+    
+    var displayRest: String {
+        if let rest = rest, !rest.isEmpty {
+            return rest
+        }
+        return "60s"
+    }
 
     // To make `Assignment` Codable when `exercise` is populated client-side
     // and not part of the JSON for Assignment itself:
@@ -204,6 +231,28 @@ struct Workout: Codable, Identifiable, Hashable {
 
     // Add CodingKeys only if Go JSON keys differ
     // enum CodingKeys: String, CodingKey { ... }
+}
+
+// MARK: - Email Authentication Models
+
+struct EmailRegistrationRequest: Codable {
+    let name: String
+    let email: String
+    let password: String
+    let role: String
+}
+
+struct EmailLoginRequest: Codable {
+    let email: String
+    let password: String
+}
+
+struct PasswordResetRequest: Codable {
+    let email: String
+}
+
+struct EmptyResponse: Codable {
+    // Empty response for endpoints that don't return data
 }
 
 // --- DTO for Create Workout Request Body ---

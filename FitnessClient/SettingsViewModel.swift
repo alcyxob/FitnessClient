@@ -1,19 +1,46 @@
 // SettingsViewModel.swift
 import SwiftUI
 
+// Helper struct for empty API payloads
+struct EmptyPayload: Encodable {}
+
 @MainActor
 class SettingsViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String? = nil
 
     private let apiService: APIService
-    private let authService: AuthService // To update the global user object
+    let authService: AuthService // Made public for access from views
     private let appModeManager: AppModeManager
 
     init(apiService: APIService, authService: AuthService, appModeManager: AppModeManager) {
         self.apiService = apiService
         self.authService = authService
         self.appModeManager = appModeManager
+    }
+    
+    func logout() async {
+        print("SettingsVM: Logging out...")
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            // Call logout endpoint if your API has one
+            // try await apiService.POST(endpoint: "/auth/logout", body: EmptyPayload())
+            
+            // Clear local authentication state
+            await authService.logout()
+            
+            print("SettingsVM: Successfully logged out")
+        } catch {
+            print("SettingsVM: Logout error: \(error)")
+            errorMessage = "Failed to logout: \(error.localizedDescription)"
+            
+            // Even if API call fails, clear local state
+            await authService.logout()
+        }
+        
+        isLoading = false
     }
 
     func activateTrainerRole() async {

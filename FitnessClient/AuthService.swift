@@ -238,6 +238,214 @@ class AuthService: ObservableObject {
         isLoading = false
     }
 
+    // MARK: - Email Authentication
+    
+    func registerWithEmail(name: String, email: String, password: String) async {
+        print("AuthService: Starting email registration for \(email)")
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            let request = EmailRegistrationRequest(
+                name: name,
+                email: email,
+                password: password,
+                role: "client" // Default to client role
+            )
+            
+            print("AuthService: Sending registration request to backend")
+            
+            // Registration endpoint returns UserResponse (no token), so we expect just user data
+            let userResponse: UserResponse = try await makeAuthenticatedRequest(
+                endpoint: "/auth/register",
+                method: "POST",
+                body: request
+            )
+            
+            print("AuthService: Email registration successful, user created: \(userResponse.email)")
+            print("AuthService: Now logging in automatically...")
+            
+            // Registration successful, now automatically log in to get the token
+            await loginWithEmail(email: email, password: password)
+            
+        } catch {
+            print("AuthService: Email registration failed - \(error)")
+            handleAuthError(error, context: "Email Registration")
+        }
+        
+        isLoading = false
+    }
+    
+    func loginWithEmail(email: String, password: String) async {
+        print("AuthService: Starting email login for \(email)")
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            let request = EmailLoginRequest(email: email, password: password)
+            
+            print("AuthService: Sending login request to backend")
+            let response: LoginResponse = try await makeAuthenticatedRequest(
+                endpoint: "/auth/login",
+                method: "POST",
+                body: request
+            )
+            
+            print("AuthService: Email login successful")
+            await processSuccessfulLogin(token: response.token, user: response.user)
+            
+        } catch {
+            print("AuthService: Email login failed - \(error)")
+            handleAuthError(error, context: "Email Login")
+        }
+        
+        isLoading = false
+    }
+    
+    func requestPasswordReset(email: String) async {
+        print("AuthService: Requesting password reset for \(email)")
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            let request = PasswordResetRequest(email: email)
+            
+            let _: EmptyResponse = try await makeAuthenticatedRequest(
+                endpoint: "/auth/forgot-password",
+                method: "POST",
+                body: request
+            )
+            
+            print("AuthService: Password reset request sent successfully")
+            // Success handled by UI showing confirmation message
+            
+        } catch {
+            print("AuthService: Password reset request failed - \(error)")
+            handleAuthError(error, context: "Password Reset Request")
+        }
+        
+        isLoading = false
+    }
+    
+    // MARK: - Helper Methods for Email Auth
+    
+    private func makeAuthenticatedRequest<T: Codable, U: Codable>(
+        endpoint: String,
+        method: String,
+        body: T
+    ) async throws -> U {
+        let url = baseURL.appendingPathComponent(endpoint)
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // Encode request body
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        
+        do {
+            request.httpBody = try encoder.encode(body)
+        } catch {
+            print("AuthService: JSON encoding failed - \(error)")
+            throw AppError.encodingFailed
+        }
+        
+        // Make request
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch {
+            // Handle network connectivity errors
+            if let urlError = error as? URLError {
+                switch urlError.code {
+                case .notConnectedToInternet, .networkConnectionLost:
+                    throw AppError.networkUnavailable
+                case .timedOut:
+                    throw AppError.requestTimeout
+                default:
+                    throw AppError.unknown("Network error: \(urlError.localizedDescription)")
+                }
+            } else {
+                throw AppError.unknown("Request failed: \(error.localizedDescription)")
+            }
+        }
+        
+        // Debug: Print raw response
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("AuthService: Raw API response: \(responseString)")
+        }
+        
+        // Check HTTP response
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AppError.invalidData
+        }
+        
+        guard 200...299 ~= httpResponse.statusCode else {
+            // Try to decode error response
+            if let errorData = try? JSONDecoder().decode(APIErrorResponse.self, from: data) {
+                throw AppError.serverError(statusCode: httpResponse.statusCode, message: errorData.error)
+            } else {
+                switch httpResponse.statusCode {
+                case 401:
+                    throw AppError.unauthorized
+                case 403:
+                    throw AppError.forbidden
+                case 404:
+                    throw AppError.notFound
+                case 429:
+                    throw AppError.rateLimited
+                case 500...599:
+                    throw AppError.serverError(statusCode: httpResponse.statusCode, message: nil)
+                default:
+                    throw AppError.serverError(statusCode: httpResponse.statusCode, message: "HTTP \(httpResponse.statusCode)")
+                }
+            }
+        }
+        
+        // Decode successful response
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let dateString = try container.decode(String.self)
+            
+            // Create formatters for different date formats that the backend might send
+            let nanosecondFormatter = DateFormatter()
+            nanosecondFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS'Z'"
+            nanosecondFormatter.timeZone = TimeZone(abbreviation: "UTC")
+            
+            let millisecondFormatter = DateFormatter()
+            millisecondFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
+            millisecondFormatter.timeZone = TimeZone(abbreviation: "UTC")
+            
+            let secondFormatter = DateFormatter()
+            secondFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'"
+            secondFormatter.timeZone = TimeZone(abbreviation: "UTC")
+            
+            // Try different date formats
+            if let date = nanosecondFormatter.date(from: dateString) {
+                return date
+            } else if let date = millisecondFormatter.date(from: dateString) {
+                return date
+            } else if let date = secondFormatter.date(from: dateString) {
+                return date
+            }
+            
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Cannot decode date string: \(dateString)"
+                )
+            )
+        }
+        
+        do {
+            return try decoder.decode(U.self, from: data)
+        } catch {
+            print("AuthService: JSON decoding failed - \(error)")
+            throw AppError.decodingFailed
+        }
+    }
+
     // --- Logout Function ---
     func logout() async { // Mark as async if clearSession becomes async
         await clearSession()

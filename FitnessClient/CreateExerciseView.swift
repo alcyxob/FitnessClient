@@ -20,35 +20,33 @@ struct CreateExerciseView: View {
         NavigationView {
             Form {
                 Section(header: Text("Exercise Details")) {
-                    TextField("Name (Required)", text: $viewModel.name)
+                    TextField("Name (Required)", text: $viewModel.exerciseName)
                         .focused($focusedField, equals: .name)
                         .submitLabel(.next)
                     
-                    TextField("Description (Optional)", text: $viewModel.description, axis: .vertical)
+                    TextField("Description (Optional)", text: $viewModel.exerciseDescription, axis: .vertical)
                         .lineLimit(3...)
                         .focused($focusedField, equals: .description)
                         .submitLabel(.next)
                     
-                    TextField("Muscle Group (e.g., Chest, Legs)", text: $viewModel.muscleGroup)
+                    TextField("Muscle Group (e.g., Chest, Legs)", text: $viewModel.selectedMuscleGroup)
                         .focused($focusedField, equals: .muscleGroup)
                         .submitLabel(.next)
                 }
 
                 Section(header: Text("Execution & Properties")) {
-                    TextField("Execution Technic", text: $viewModel.executionTechnic, axis: .vertical)
+                    TextField("Execution Technic", text: $viewModel.executionTechnique, axis: .vertical)
                         .lineLimit(5...)
                         .focused($focusedField, equals: .executionTechnic)
                         // For the last text field, you might want .done or let the button handle submission
                         // .submitLabel(.done)
                     
-                    Picker("Applicability", selection: $viewModel.applicability) {
-                        ForEach(viewModel.applicabilityOptions, id: \.self) { option in
-                            Text(option)
-                        }
-                    }
+                    TextField("Applicability", text: $viewModel.applicability)
+                        .focused($focusedField, equals: .name)
+                        .submitLabel(.next)
                     
-                    Picker("Difficulty", selection: $viewModel.difficulty) {
-                        ForEach(viewModel.difficultyOptions, id: \.self) { option in
+                    Picker("Difficulty", selection: $viewModel.selectedDifficulty) {
+                        ForEach(["Beginner", "Intermediate", "Advanced"], id: \.self) { option in
                             Text(option)
                         }
                     }
@@ -72,7 +70,7 @@ struct CreateExerciseView: View {
                                 await viewModel.createExercise()
                             }
                         }
-                        .disabled(viewModel.name.isEmpty || viewModel.isLoading)
+                        .disabled(viewModel.exerciseName.isEmpty || viewModel.isLoading)
                     }
                 }
 
@@ -108,7 +106,7 @@ struct CreateExerciseView: View {
                     focusedField = nil
                 }
             }
-            .onChange(of: viewModel.didCreateExercise) { success in
+            .onChange(of: viewModel.didCreateSuccessfully) { success in
                 if success {
                     dismiss() // Dismiss the view on successful creation
                 }

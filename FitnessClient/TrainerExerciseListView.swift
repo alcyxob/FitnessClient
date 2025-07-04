@@ -102,10 +102,14 @@ struct TrainerExerciseListView: View {
                             await viewModel.fetchTrainerExercises()
                         }
                    }) {
-                // Content of the sheet: CreateExerciseView
-                // Pass the APIService to CreateExerciseView's initializer
-                CreateExerciseView(apiService: apiService)
-                    // CreateExerciseView might also need authService if it needs user info directly,
+                // Content of the sheet: PolishedCreateExerciseView
+                // Pass the APIService to PolishedCreateExerciseView's initializer
+                PolishedCreateExerciseView(apiService: apiService) {
+                    // Refresh exercises when exercise is created
+                    Task {
+                        await viewModel.fetchTrainerExercises()
+                    }
+                }
                     // but typically ViewModel handles that.
                     // .environmentObject(authService)
             }

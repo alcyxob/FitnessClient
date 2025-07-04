@@ -8,7 +8,7 @@ class TrainerExerciseListViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String? = nil
 
-    private let apiService: APIService
+    let apiService: APIService
     private let authService: AuthService // Needed to get current trainer's ID
 
     init(apiService: APIService, authService: AuthService) {

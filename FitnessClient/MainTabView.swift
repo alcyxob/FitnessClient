@@ -40,13 +40,13 @@ struct MainTabView: View {
     // Helper for Client-specific tabs
     @ViewBuilder
     private var clientTabs: some View {
-        ClientDashboardView(apiService: apiService, authService: authService)
+        PolishedClientDashboardView(apiService: apiService, authService: authService)
             .tabItem { 
                 Label("Today", systemImage: "figure.mixed.cardio")
             }
             .tag(0)
 
-        ClientPlansView(apiService: apiService)
+        PolishedClientPlansView(apiService: apiService)
             .tabItem { 
                 Label("My Plans", systemImage: "list.star") 
             }
@@ -58,7 +58,7 @@ struct MainTabView: View {
             }
             .tag(2)
 
-        SettingsView(viewModel: SettingsViewModel(apiService: apiService, authService: authService, appModeManager: appModeManager))
+        PolishedSettingsView(viewModel: SettingsViewModel(apiService: apiService, authService: authService, appModeManager: appModeManager))
             .tabItem { 
                 Label("Settings", systemImage: "gearshape.fill") 
             }
@@ -68,25 +68,25 @@ struct MainTabView: View {
     // Helper for Trainer-specific tabs
     @ViewBuilder
     private var trainerTabs: some View {
-        TrainerDashboardView(apiService: apiService, authService: authService)
+        PolishedTrainerDashboardView(apiService: apiService, authService: authService)
             .tabItem { 
                 Label("Dashboard", systemImage: "chart.bar.doc.horizontal") 
             }
             .tag(0)
 
-        TrainerExerciseListView(viewModel: TrainerExerciseListViewModel(apiService: apiService, authService: authService))
+        PolishedTrainerExerciseListView(viewModel: TrainerExerciseListViewModel(apiService: apiService, authService: authService))
             .tabItem { 
                 Label("Exercises", systemImage: "figure.strengthtraining.traditional") 
             }
             .tag(1)
 
-        TrainerClientsView(viewModel: TrainerClientsViewModel(apiService: apiService))
+        PolishedTrainerClientsView(viewModel: TrainerClientsViewModel(apiService: apiService))
             .tabItem { 
                 Label("Clients", systemImage: "person.2.fill") 
             }
             .tag(2)
         
-        SettingsView(viewModel: SettingsViewModel(apiService: apiService, authService: authService, appModeManager: appModeManager))
+        PolishedSettingsView(viewModel: SettingsViewModel(apiService: apiService, authService: authService, appModeManager: appModeManager))
             .tabItem { 
                 Label("Settings", systemImage: "gearshape.fill") 
             }

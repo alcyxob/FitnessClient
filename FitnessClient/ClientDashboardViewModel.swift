@@ -64,4 +64,68 @@ class ClientDashboardViewModel: ObservableObject {
         isLoading = false
         print("ClientDashboardVM: fetchTodaysWorkouts finished. isLoading: \(isLoading), Count: \(todaysWorkouts.count), Error: \(errorMessage ?? "None")")
     }
+    
+    // MARK: - Additional Data Fetching
+    
+    @Published var recentActivity: [WorkoutSession] = []
+    @Published var progressStats: ProgressStats?
+    
+    func fetchRecentActivity() async {
+        print("ClientDashboardVM: Fetching recent activity...")
+        
+        do {
+            let sessions: [WorkoutSession] = try await apiService.GET(endpoint: "/client/workout-sessions/recent")
+            self.recentActivity = sessions
+            print("ClientDashboardVM: Successfully fetched \(sessions.count) recent activities.")
+        } catch {
+            print("ClientDashboardVM: Error fetching recent activity: \(error)")
+            self.recentActivity = []
+        }
+    }
+    
+    func fetchProgressStats() async {
+        print("ClientDashboardVM: Fetching progress stats...")
+        
+        do {
+            let stats: ProgressStats = try await apiService.GET(endpoint: "/client/progress/stats")
+            self.progressStats = stats
+            print("ClientDashboardVM: Successfully fetched progress stats.")
+        } catch {
+            print("ClientDashboardVM: Error fetching progress stats: \(error)")
+            self.progressStats = nil
+        }
+    }
+    
+    func refreshAllData() async {
+        await fetchTodaysWorkouts()
+        await fetchRecentActivity()
+        await fetchProgressStats()
+    }
+}
+
+// MARK: - Supporting Models
+
+struct ProgressStats: Codable {
+    let totalWorkouts: Int
+    let weeklyGoal: Int
+    let currentStreak: Int
+    let completionRate: Double
+    let totalMinutes: Int
+    
+    var weeklyProgress: Double {
+        return min(Double(totalWorkouts) / Double(weeklyGoal), 1.0)
+    }
+}
+
+struct WorkoutSession: Codable, Identifiable {
+    let id: String
+    let workoutName: String
+    let completedAt: Date
+    let duration: Int // in minutes
+    let exercisesCompleted: Int
+    let totalExercises: Int
+    
+    var completionPercentage: Double {
+        return Double(exercisesCompleted) / Double(totalExercises)
+    }
 }

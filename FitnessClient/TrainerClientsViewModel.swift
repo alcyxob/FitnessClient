@@ -6,7 +6,7 @@ import SwiftUI
 class TrainerClientsViewModel: ListViewModel<UserResponse> {
     @Published var greeting: String = ""
     
-    private let apiService: APIService
+    let apiService: APIService // Made public for access
     
     init(apiService: APIService) {
         self.apiService = apiService

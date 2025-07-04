@@ -15,21 +15,19 @@ enum AppMode: String, CaseIterable {
         }
     }
     
+    var icon: String {
+        switch self {
+        case .client: return "figure.walk"
+        case .trainer: return "person.badge.key.fill"
+        }
+    }
+    
     var description: String {
         switch self {
         case .client:
             return "Access your workouts, plans, and progress"
         case .trainer:
             return "Manage clients, create exercises, and assign workouts"
-        }
-    }
-    
-    var icon: String {
-        switch self {
-        case .client:
-            return "figure.walk"
-        case .trainer:
-            return "person.badge.key"
         }
     }
 }

@@ -17,6 +17,11 @@ struct FitnessClientApp: App {
     @StateObject private var toastManager = ToastManager()
     @StateObject private var appModeManager = AppModeManager()
     @StateObject private var themeManager: AppThemeManager
+    
+    // Offline capabilities
+    @StateObject private var coreDataManager = CoreDataManager.shared
+    @StateObject private var networkMonitor = NetworkMonitor.shared
+    @StateObject private var syncManager = SyncManager.shared
 
     init() {
         // Initialize authService first as apiService depends on it
@@ -39,8 +44,20 @@ struct FitnessClientApp: App {
                 .environmentObject(toastManager)
                 .environmentObject(appModeManager)
                 .environmentObject(themeManager)
+                .environmentObject(coreDataManager)
+                .environmentObject(networkMonitor)
+                .environmentObject(syncManager)
                 .environment(\.appTheme, themeManager.currentTheme)
+                .environment(\.managedObjectContext, coreDataManager.context)
                 .toastView(toast: $toastManager.currentToast) // <<< APPLY MODIFIER
+                .onAppear {
+                    // Start initial sync if connected
+                    if networkMonitor.isConnected {
+                        Task {
+                            await syncManager.syncAll()
+                        }
+                    }
+                }
         }
     }
 }

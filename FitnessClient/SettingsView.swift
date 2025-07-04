@@ -62,6 +62,11 @@ struct SettingsView: View {
 //                            .pickerStyle(.segmented)
 //                        }
 //                    }
+                    // --- OFFLINE & SYNC SETTINGS ---
+                    Section {
+                        OfflineSettingsSection()
+                    }
+                    
                     Section("App Role") {
                         if let user = authService.loggedInUser, user.roles.contains("trainer") && user.roles.contains("client") {
                             ModeSwitcherView() // New helper view for the switcher
